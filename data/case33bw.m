@@ -1,3 +1,5 @@
+%%Retrieved from: https://github.com/MATPOWER/matpower/blob/master/data/case33bw.m
+
 function mpc = case33bw
 %CASE33BW  Power flow data for 33 bus distribution system from Baran & Wu
 %   Please see CASEFORMAT for details on the case file format.
