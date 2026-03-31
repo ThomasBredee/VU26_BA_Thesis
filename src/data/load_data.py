@@ -1,5 +1,10 @@
 import pandas as pd
 
+# Will use:
+# https://opendata.cbs.nl/#/CBS/nl/dataset/83023NED/table?ts=1774355181788
+# E1C_AMI_A (demand - with PV)
+# E1C_AMI_I (PV generation)
+# E1C_AMI_A (demand - no PV)
 
 def load_profile(filepath):
     df = pd.read_csv(
