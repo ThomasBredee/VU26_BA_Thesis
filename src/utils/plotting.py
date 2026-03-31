@@ -17,6 +17,18 @@ def plot_noise_comparison(original, noisy, n=200):
 
     plt.show()
 
+def plot_first_hours_prices(prices_df, n=200):
+    plt.figure(figsize=(12, 5))
+    plt.plot(prices_df.index[:n], prices_df['Price'][:n], marker='o', linestyle='-')
+    plt.title(f"Electricity Prices — First {n} Hours")
+    plt.xlabel("Datetime")
+    plt.ylabel("Price [EUR/MWhe]")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
 
 def plot_daily_average(profile):
     """

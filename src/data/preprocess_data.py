@@ -19,18 +19,22 @@ def add_noise(profile, noise_level=0.02, seed=42):
     return noisy
 
 
+def add_ARIMA_noise(profile, noise_level = 0.08, rho = 0.9, seed=42):
+    
+    #rho is correlation between hours.
+    
+    np.random.seed(seed)
+    
+    noise = np.zeros(len(profile))
+    eps = np.random.normal(0, noise_level, len(profile))
+
+    for t in range(1, len(noise)):
+        noise[t] = rho * noise[t-1] + eps[t]
+
+    profile_noisy = profile.copy()
+    profile_noisy.iloc[:, 0] = profile.iloc[:, 0] * (1 + noise)
+    profile_noisy.iloc[:, 0] = profile_noisy.iloc[:, 0].clip(lower=0)
+
+    return profile_noisy
 
 
-# np.random.seed(42)
-# noise_level = 0.08
-# rho = 0.9  # correlation between hours
-
-# noise = np.zeros(len(profile_1))
-# eps = np.random.normal(0, noise_level, len(profile_1))
-
-# for t in range(1, len(noise)):
-#     noise[t] = rho * noise[t-1] + eps[t]
-
-# profile_noisy = profile_1.copy()
-# profile_noisy.iloc[:, 0] = profile_1.iloc[:, 0] * (1 + noise)
-# profile_noisy.iloc[:, 0] = profile_noisy.iloc[:, 0].clip(lower=0)

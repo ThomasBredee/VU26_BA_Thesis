@@ -6,7 +6,7 @@ import pandapower.plotting as plot
 # -----------------------------
 # 1. Load MATPOWER case
 # -----------------------------
-mpc_file = "case33bw.m"  # make sure this file is in your folder
+mpc_file = "data/case33bw.m"  # make sure this file is in your folder
 
 net = pn.case33bw()
 
@@ -76,9 +76,11 @@ substation = {
 # -----------------------------
 print("\n=== BUSES ===")
 print(buses_df.head())
+print(buses_df.columns)
 
 print("\n=== LINES ===")
 print(lines_df.head())
+print(lines_df.columns)
 
 print("\n=== SUBSTATION ===")
 print(substation)
