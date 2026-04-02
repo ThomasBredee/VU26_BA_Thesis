@@ -1,6 +1,6 @@
 from config import DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE, NOISE_LEVEL, RESAMPLE_FREQ
 
-from src.data.load_data import load_profile, load_year_prices
+from src.data.load_data import load_demand_profile, load_year_prices
 from src.data.preprocess_data import resample, add_noise, add_ARIMA_noise
 # from src.network.create_network import create_network
 
@@ -18,7 +18,7 @@ def main():
     print('Starting pipeline................. \n')
 
     # Load data
-    profile = load_profile(DATA_PATH_DEMAND)
+    profile = load_demand_profile(DATA_PATH_DEMAND)
 
     # Preprocess
     profile = resample(profile, RESAMPLE_FREQ)

@@ -6,7 +6,7 @@ import pandas as pd
 # E1C_AMI_I (PV generation)
 # E1C_AMI_A (demand - no PV)
 
-def load_profile(filepath):
+def load__demand_profile(filepath):
     df = pd.read_csv(
         filepath,
         sep=';',
