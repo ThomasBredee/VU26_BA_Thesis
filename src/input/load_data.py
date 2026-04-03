@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Will use:
 # https://opendata.cbs.nl/#/CBS/nl/dataset/83023NED/table?ts=1774355181788
@@ -6,7 +7,7 @@ import pandas as pd
 # E1C_AMI_I (PV generation)
 # E1C_AMI_A (demand - no PV)
 
-def load__demand_profile(filepath):
+def load__demand_profile_percentages(filepath):
     df = pd.read_csv(
         filepath,
         sep=';',
@@ -22,11 +23,27 @@ def load__demand_profile(filepath):
     profile = df[["van", "1.00_E1C_AMI_A"]]
     profile = profile.set_index("van")
 
-    return profile
+    # Return an resampled hourly percentage profile
+    return profile.resample("h").sum()
 
-import pandas as pd
 
-def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)'):
+
+def plot_first_hours_prices(prices_df, n=200):
+    plt.figure(figsize=(12, 5))
+    plt.plot(prices_df.index[:n], prices_df['Price'][:n], marker='o', linestyle='-')
+    plt.title(f"Electricity Prices — First {n} Hours")
+    plt.xlabel("Datetime")
+    plt.ylabel("Price [EUR/MWhe]")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+def convert_series_to_dict(series, T):
+    values = series.values.flatten()
+    return {t: values[t] for t in T}
+
+def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
     """
     Load hourly electricity prices from CSV and return only data for a specified year.
 
@@ -63,4 +80,8 @@ def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col=
     df.set_index('Datetime', inplace=True)
     df.sort_index(inplace=True)
 
+    if verbose:
+        plot_first_hours_prices(df)
+
     return df
+

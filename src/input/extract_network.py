@@ -1,6 +1,9 @@
 import numpy as np
+import pandapower.plotting as plot
+import pandapower.networks as pn
 
-def extract_network_data(net):
+
+def extract_network_data(net, verbose=False):
     """
     Extract only structural network data from a pandapower network that is given as input.
 
@@ -59,4 +62,17 @@ def extract_network_data(net):
         'Pmax_sub': Pmax_sub
     }
 
+    if verbose:
+        print("\n=== NETWORK SUMMARY ===")
+        print(f"Number of buses: {len(net.bus)}")
+        print(f"Number of lines: {len(net.line)}")
+        print(f"Substation bus: {net.ext_grid.bus.iloc[0]}")
+        plot.simple_plot(net, plot_line_switches=False)
+
     return data
+
+
+
+# net = pn.case33bw()
+# data = extract_network_data(net, verbose=True)
+# # print(data)
