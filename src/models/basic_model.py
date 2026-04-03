@@ -1,5 +1,6 @@
 
 from pyomo.environ import *
+from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
 
 # data = {
 #     'B': [0,1,2],
@@ -145,11 +146,16 @@ def build_model(data):
     # Objective
     # -------------------------
     def obj_rule(m):
-        return (
-            sum(m.c[t] * sum(m.P_sub[s, t] for s in m.B_prime) for t in m.T)
-            + sum(m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B)
-            + m.gamma * sum(m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T)
+        energy_cost = sum(
+            m.c[t] * sum(m.P_sub[s, t] for s in m.B_prime) for t in m.T
         )
+        investment_cost = sum(
+            m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
+        )
+        operation_cost = sum(
+            m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
+        )
+        return energy_cost + investment_cost + operation_cost
     model.OBJ = Objective(rule=obj_rule, sense=minimize)
 
     # -------------------------
@@ -189,18 +195,38 @@ def build_model(data):
     model.SOC = Constraint(model.B, model.T, rule=soc_rule)
 
     # SOC limits
-    def soc_limit_rule(m, i, t):
-        return (m.SOC_min * m.Emax[i], m.E[i, t], m.SOC_max * m.Emax[i])
-    model.SOCLimits = Constraint(model.B, model.T, rule=soc_limit_rule)
+    # def soc_limit_rule(m, i, t):
+    #     return (m.SOC_min * m.Emax[i], m.E[i, t], m.SOC_max * m.Emax[i])
+    # model.SOCLimits = Constraint(model.B, model.T, rule=soc_limit_rule)
+
+    # SOC >= SOC_min * Emax
+    def soc_lower_limit_rule(m, i, t):
+        return m.E[i, t] >= m.SOC_min * m.Emax[i]
+    model.SOCLowerLimits = Constraint(model.B, model.T, rule=soc_lower_limit_rule)
+
+    # SOC <= SOC_max * Emax
+    def soc_upper_limit_rule(m, i, t):
+        return m.E[i, t] <= m.SOC_max * m.Emax[i]
+    model.SOCUpperLimits = Constraint(model.B, model.T, rule=soc_upper_limit_rule)
 
     # Charging and discharging limits
-    def charge_limit_rule(m, i, t):
-        return (0, m.pCHA[i, t], m.Pmax[i])
-    model.ChargeLimit = Constraint(model.B, model.T, rule=charge_limit_rule)
+    # def charge_limit_rule(m, i, t):
+    #     return (0, m.pCHA[i, t], m.Pmax[i])
+    # model.ChargeLimit = Constraint(model.B, model.T, rule=charge_limit_rule)
 
-    def discharge_limit_rule(m, i, t):
-        return (0, m.pDIS[i, t], m.Pmax[i])
-    model.DischargeLimit = Constraint(model.B, model.T, rule=discharge_limit_rule)
+    # def discharge_limit_rule(m, i, t):
+    #     return (0, m.pDIS[i, t], m.Pmax[i])
+    # model.DischargeLimit = Constraint(model.B, model.T, rule=discharge_limit_rule)
+    
+    # Lower bound: charging >= 0
+    def charge_lower_rule(m, i, t):
+        return m.pCHA[i, t] >= 0
+    model.ChargeLower = Constraint(model.B, model.T, rule=charge_lower_rule)
+
+    # Upper bound: charging <= Pmax
+    def charge_upper_rule(m, i, t):
+        return m.pCHA[i, t] <= m.Pmax[i]
+    model.ChargeUpper = Constraint(model.B, model.T, rule=charge_upper_rule)
 
     # Big-M constraints
     def bigM_power_rule(m, i):
