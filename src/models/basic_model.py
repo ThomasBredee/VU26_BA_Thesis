@@ -79,7 +79,9 @@ def build_model(data):
     data['MP'] = bigM_values['MP']
     data['ME'] = bigM_values['ME']
 
-    
+    print(data['MP'], data['ME'])
+
+
     """
     Build a Pyomo MILP model including an explicit substation bus.
 
@@ -168,10 +170,18 @@ def build_model(data):
     model.NetInjection = Constraint(model.B, model.T, rule=net_injection_rule)
 
     # Power balance: inflow - outflow = net injection
+    # def power_balance_rule(m, i, t):
+    #     inflow = sum(m.P[j, i, t] for (j, i2) in m.L if i2 == i)
+    #     outflow = sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i)
+    #     return m.p[i, t] == inflow - outflow
+    # model.PowerBalance = Constraint(model.B, model.T, rule=power_balance_rule)
+    # Adjusted Power balance rule:
     def power_balance_rule(m, i, t):
-        inflow = sum(m.P[j, i, t] for (j, i2) in m.L if i2 == i)
-        outflow = sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i)
-        return m.p[i, t] == inflow - outflow
+        return m.p[i, t] == sum(
+            (1 if i == i_line else -1) * m.P[i_line, j_line, t]
+            for (i_line, j_line) in m.L
+            if i == i_line or i == j_line
+        )
     model.PowerBalance = Constraint(model.B, model.T, rule=power_balance_rule)
 
     # Line capacity limits
@@ -183,6 +193,15 @@ def build_model(data):
     def substation_limit_rule(m, s, t):
         return (0, m.P_sub[s, t], m.Pmax_sub[s])
     model.SubstationLimit = Constraint(model.B_prime, model.T, rule=substation_limit_rule)
+
+    # Connect substation to network
+    def substation_balance_rule(m, s, t):
+        return m.P_sub[s, t] == sum(
+            (1 if s == i else -1) * m.P[i, j, t]
+            for (i, j) in m.L
+            if s == i or s == j
+        )
+    model.SubstationBalance = Constraint(model.B_prime, model.T, rule=substation_balance_rule)
 
     # SOC dynamics
     def soc_rule(m, i, t):

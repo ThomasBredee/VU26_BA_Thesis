@@ -1,6 +1,6 @@
 import pandapower.networks as pn
 
-NETWORK_CHOICE = pn.case33bw
+NETWORK_CHOICE = pn.simple_four_bus_system
 TIME = 8760
 
 # NOISE_LEVEL = 0.02

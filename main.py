@@ -19,6 +19,7 @@ from src.utils.plotting import (
 
 # import gurobipy as gp
 import numpy as np
+from pyomo.environ import SolverFactory
 
 def sanitize_data_scalars(data):
     """
@@ -80,6 +81,7 @@ def main():
 
     model = build_model(data)
 
+    # print(data['L'])
     # print(data['pD'])
     # print(min(t for (_, t) in data['pD'].keys()))
     # print(max(t for (_, t) in data['pD'].keys()))
@@ -87,36 +89,46 @@ def main():
     
     # sanitize_data_scalars(data)
 
-    # results = solve_model(model)
+    results = solve_model(model)
+    extract_results(model, results)
 
 
-    from pyomo.environ import SolverFactory
+    # from pyomo.environ import SolverFactory
 
-    # Choose your solver
-    solver = SolverFactory('gurobi')
+    # # Choose your solver
+    # solver = SolverFactory('gurobi')
 
-    # Enable IIS detection
-    solver.options['OutputFlag'] = 1  # Show solver messages
-    solver.options['IIS'] = 1         # Ask Gurobi to generate IIS
+    # # Enable IIS detection
+    # solver.options['OutputFlag'] = 1  # Show solver messages
+    # solver.options['IIS'] = 1         # Ask Gurobi to generate IIS
 
     # Solve the model
-    results = solver.solve(model, tee=True)
+    # results = solver.solve(model, tee=True)
 
-    # Check if infeasible
-    if results.solver.termination_condition == 'infeasibleOrUnbounded':
-        print("Model is infeasible. Writing IIS...")
-        
-        # Write IIS to a file (Gurobi writes .ilp with conflicting constraints)
-        model.write('model_iis.ilp', format='lp')
-        
-        # In Gurobi, you can call the following to write the IIS itself:
-        # (Pyomo doesn't expose IIS writer directly, so we trigger it via solver)
-        solver.solve(model, options={'IIS': 1})
-        print("IIS written. Check the .ilp file or Gurobi output to see problematic constraints.")
-    else:
-        print("Solver status:", results.solver.termination_condition)
 
-    extract_results(model, results)
+    
+
+    # # Solve model normally in Pyomo
+    # solver = SolverFactory('gurobi')
+    # results = solver.solve(model, tee=True)
+
+    # if results.solver.termination_condition == 'infeasibleOrUnbounded':
+    #     print("Model is infeasible. Exporting LP for IIS analysis...")
+        
+    #     # Export LP
+    #     model_lp_file = "model.lp"
+    #     model.write(model_lp_file, format='lp')
+
+    #     # Load LP directly in Gurobi
+    #     import gurobipy as gp
+    #     grb_model = gp.read(model_lp_file)
+
+    #     # Compute IIS
+    #     grb_model.computeIIS()
+    #     grb_model.write("model_iis.ilp")
+    #     print("IIS written to 'model_iis.ilp'. Check it in Gurobi to see infeasible constraints.")
+    # else:
+    #     print("Solver status:", results.solver.termination_condition)
     
     print("Pipeline executed successfully.")
 
