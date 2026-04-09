@@ -21,32 +21,33 @@ from src.utils.plotting import (
 import numpy as np
 from pyomo.environ import SolverFactory
 
-def sanitize_data_scalars(data):
-    """
-    Automatically converts any tuple or single-element list in `data` to scalar.
-    Prints what it changed for transparency.
-    """
-    for key, value in data.items():
-        if isinstance(value, tuple) and len(value) == 1:
-            data[key] = value[0]
-            print(f"🔧 Converted tuple to scalar for key '{key}': {value} -> {data[key]}")
-        elif isinstance(value, list) and len(value) == 1:
-            data[key] = value[0]
-            print(f"🔧 Converted single-element list to scalar for key '{key}': {value} -> {data[key]}")
-        elif isinstance(value, np.ndarray) and value.size == 1:
-            data[key] = value.item()
-            print(f"🔧 Converted 1-element ndarray to scalar for key '{key}': {value} -> {data[key]}")
-        else:
-            # Already scalar or multi-element, no change
-            pass
-    return data
+# def sanitize_data_scalars(data):
+#     """
+#     Automatically converts any tuple or single-element list in `data` to scalar.
+#     Prints what it changed for transparency.
+#     """
+#     for key, value in data.items():
+#         if isinstance(value, tuple) and len(value) == 1:
+#             data[key] = value[0]
+#             print(f"🔧 Converted tuple to scalar for key '{key}': {value} -> {data[key]}")
+#         elif isinstance(value, list) and len(value) == 1:
+#             data[key] = value[0]
+#             print(f"🔧 Converted single-element list to scalar for key '{key}': {value} -> {data[key]}")
+#         elif isinstance(value, np.ndarray) and value.size == 1:
+#             data[key] = value.item()
+#             print(f"🔧 Converted 1-element ndarray to scalar for key '{key}': {value} -> {data[key]}")
+#         else:
+#             # Already scalar or multi-element, no change
+#             pass
+#     return data
 
 def main():
     print('Starting pipeline................. \n')
 
     # Create network
     net = NETWORK_CHOICE() 
-    data = extract_network_data(net)
+    data = extract_network_data(net, verbose=False)
+    # print(data.keys(), data)
 
     # Create time array
     data['T'] = list(range(TIME))
@@ -80,56 +81,65 @@ def main():
     data['SOC_max'] = SOC_MAX
 
     model = build_model(data)
-
-    # print(data['L'])
-    # print(data['pD'])
-    # print(min(t for (_, t) in data['pD'].keys()))
-    # print(max(t for (_, t) in data['pD'].keys()))
-    # print(data['T'][0], data['T'][-1])
+    print("Pmax_sub: ", data['Pmax_sub'])
     
-    # sanitize_data_scalars(data)
 
+    print("B: ", data['B'])
+    print("B_prime: ", data['B_prime'])
+    print("L: ", data['L'])
+
+    t0 = min(t for (_, t) in data['pD'].keys())
+
+    for i in data['B']:
+        print(f"pD[{i}, {t0}] =", data['pD'].get((i, t0), 0))
+
+    # from pyomo.opt import SolverFactory, TerminationCondition
+
+    # solver = SolverFactory('gurobi_persistent')
+    # solver.set_instance(model)
+    # results = solver.solve(tee=True)
+    # if results.solver.termination_condition in [
+    #     TerminationCondition.infeasible,
+    #     TerminationCondition.infeasibleOrUnbounded
+    # ]:
+    #     print("\nModel infeasible — computing IIS...\n")
+    #     gurobi_model = solver._solver_model
+    #     gurobi_model.computeIIS()
+    #     gurobi_model.write("model.ilp")
+    #     print("IIS written to model.ilp")
+
+    
+
+    #DEZE UITEINDLEIJK WEER AANZETTEN!!!
     results = solve_model(model)
     extract_results(model, results)
 
+    #Testing::
+    system_balance_check = False
+    if system_balance_check:
+        print("\n=== System balance check ===")
+        T_list = list(model.T)
 
-    # from pyomo.environ import SolverFactory
+        for t in T_list[5000:5050]:
+            total_demand = sum(data['pD'].get((i, t), 0) for i in model.B)
+            total_discharge = sum(model.pDIS[i, t].value for i in model.B)
+            total_charge = sum(model.pCHA[i, t].value for i in model.B)
+            total_sub = sum(model.P_sub[s, t].value for s in model.B_prime)
 
-    # # Choose your solver
-    # solver = SolverFactory('gurobi')
+            net_battery = total_discharge - total_charge
 
-    # # Enable IIS detection
-    # solver.options['OutputFlag'] = 1  # Show solver messages
-    # solver.options['IIS'] = 1         # Ask Gurobi to generate IIS
-
-    # Solve the model
-    # results = solver.solve(model, tee=True)
-
-
-    
-
-    # # Solve model normally in Pyomo
-    # solver = SolverFactory('gurobi')
-    # results = solver.solve(model, tee=True)
-
-    # if results.solver.termination_condition == 'infeasibleOrUnbounded':
-    #     print("Model is infeasible. Exporting LP for IIS analysis...")
+            print(f"t={t}: demand={total_demand:.2f}, "
+                f"battery_net={net_battery:.2f}, "
+                f"substation={total_sub:.2f}")
         
-    #     # Export LP
-    #     model_lp_file = "model.lp"
-    #     model.write(model_lp_file, format='lp')
+        T_list = list(model.T)
 
-    #     # Load LP directly in Gurobi
-    #     import gurobipy as gp
-    #     grb_model = gp.read(model_lp_file)
+        for i in model.B:
+            soc_values = [model.E[i, t].value for t in T_list[:10]]
+            print(f"Bus {i}: {soc_values}")
 
-    #     # Compute IIS
-    #     grb_model.computeIIS()
-    #     grb_model.write("model_iis.ilp")
-    #     print("IIS written to 'model_iis.ilp'. Check it in Gurobi to see infeasible constraints.")
-    # else:
-    #     print("Solver status:", results.solver.termination_condition)
-    
+
+
     print("Pipeline executed successfully.")
 
         

@@ -5,7 +5,7 @@ def solve_model(model, tee=True):
 
     # Optional solver settings
     # solver.options['TimeLimit'] = 300      # seconds
-    # solver.options['MIPGap'] = 0.01        # 1% optimality gap
+    # solver.options['MIPGap'] = 0.005        # 0.5% optimality gap
 
     results = solver.solve(model, tee=tee)
 
@@ -44,7 +44,7 @@ def extract_results(model, results, max_print=10):
     # 3. Substation usage
     # -------------------------
     print("=== Substation usage (first timesteps) ===")
-    for t in list(model.T)[:max_print]:
+    for t in list(model.T)[5000:5000+max_print]:
         try:
             total_sub = sum(
                 value(model.P_sub[s, t]) or 0
