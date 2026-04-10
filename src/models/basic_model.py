@@ -106,8 +106,8 @@ def build_model(data):
     # print(data['MP'], data['ME'])
 
 
-    MP = {i: 25000 for i in data['B']} #TODO: stond eerst op 6 stiill needs to be adjusted!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ME = {i: 25000 for i in data['B']}
+    MP = {i: 250 for i in data['B']} #TODO: stond eerst op 6 stiill needs to be adjusted!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ME = {i: 700 for i in data['B']}
     data['MP'] = MP
     data['ME'] = ME
 
@@ -184,7 +184,7 @@ def build_model(data):
         investment_cost = sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        operation_cost = sum(
+        operation_cost = 0.1*sum(
             m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
         )
         return energy_cost + investment_cost + operation_cost
@@ -194,10 +194,10 @@ def build_model(data):
     # Constraints
     # -------------------------
 
-    # Linear relaxation of the model:
-    def linear_relaxation(m, i):
-        return m.b[i] == 1
-    model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
+    # # Linear relaxation of the model:
+    # def linear_relaxation(m, i):
+    #     return m.b[i] == 1
+    # model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
 
 
    
@@ -269,11 +269,11 @@ def build_model(data):
             return m.E[i, t] == m.E[i, t_prev] + m.pCHA[i, t] - m.pDIS[i, t]
     model.SOC = Constraint(model.B, model.T, rule=soc_rule)
 
-    # def soc_cycle_rule(m, i):
-    #     t_first = m.T.first()
-    #     t_last = m.T.last()
-    #     return m.E[i, t_last] == m.E[i, t_first]
-    # model.SOCCycle = Constraint(model.B, rule=soc_cycle_rule)
+    def soc_cycle_rule(m, i):
+        t_first = m.T.first()
+        t_last = m.T.last()
+        return m.E[i, t_last] == m.E[i, t_first]
+    model.SOCCycle = Constraint(model.B, rule=soc_cycle_rule)
 
     # SOC >= SOC_min * Emax
     def soc_lower_limit_rule(m, i, t):

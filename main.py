@@ -2,7 +2,8 @@ from config import (
     NETWORK_CHOICE,
     TIME,
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
-    CE, CP, SOC_MIN, SOC_MAX, GAMMA
+    CE, CP, SOC_MIN, SOC_MAX, GAMMA,
+    HOUSE_MIN_USAGE, HOUSE_MAX_USAGE
 )
 
 from src.input.extract_network import extract_network_data
@@ -17,61 +18,32 @@ from src.utils.plotting import (
     plot_hourly_pattern
 )
 
-# import gurobipy as gp
-import numpy as np
 from pyomo.environ import SolverFactory
-
-# def sanitize_data_scalars(data):
-#     """
-#     Automatically converts any tuple or single-element list in `data` to scalar.
-#     Prints what it changed for transparency.
-#     """
-#     for key, value in data.items():
-#         if isinstance(value, tuple) and len(value) == 1:
-#             data[key] = value[0]
-#             print(f"🔧 Converted tuple to scalar for key '{key}': {value} -> {data[key]}")
-#         elif isinstance(value, list) and len(value) == 1:
-#             data[key] = value[0]
-#             print(f"🔧 Converted single-element list to scalar for key '{key}': {value} -> {data[key]}")
-#         elif isinstance(value, np.ndarray) and value.size == 1:
-#             data[key] = value.item()
-#             print(f"🔧 Converted 1-element ndarray to scalar for key '{key}': {value} -> {data[key]}")
-#         else:
-#             # Already scalar or multi-element, no change
-#             pass
-#     return data
 
 def main():
     print('Starting pipeline................. \n')
 
     # Create network
     net = NETWORK_CHOICE() 
-    data = extract_network_data(net, verbose=False)
-    # print(data.keys(), data)
+    data = extract_network_data(net, verbose=True)
 
     # Create time array
     data['T'] = list(range(TIME))
 
-    # Create base demands based on busses
-    base_demand = generate_base_demand(data['B'], seed=42)
-
-    # Load demand data
-    demand_data_percentages = load__demand_profile_percentages(DATA_PATH_DEMAND)
-
-    # # Plot
-    # plot_noise_comparison(profile, profile_noisy)
-    # # plot_daily_average(profile)
-    # # plot_hourly_pattern(profile)
+    # Demand: load generate base demands, extract percentages, concat into noisy profiles
+    base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
+    demand_data_percentages = load__demand_profile_percentages(DATA_PATH_DEMAND, verbose=True)
     
     data['pD'] = build_pD(
         B=data['B'],
         T=data['T'],
         base_demand=base_demand,
         profile=demand_data_percentages,
-        verbose=False
+        verbose=True
     )
 
-    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=False)
+
+    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=True)
     data['c'] = convert_series_to_dict(price_series, data['T'])
 
     data['cP'] = CP
@@ -81,17 +53,17 @@ def main():
     data['SOC_max'] = SOC_MAX
 
     model = build_model(data)
-    print("Pmax_sub: ", data['Pmax_sub'])
+    # print("Pmax_sub: ", data['Pmax_sub'])
     
 
-    print("B: ", data['B'])
-    print("B_prime: ", data['B_prime'])
-    print("L: ", data['L'])
+    # print("B: ", data['B'])
+    # print("B_prime: ", data['B_prime'])
+    # print("L: ", data['L'])
 
-    t0 = min(t for (_, t) in data['pD'].keys())
+    # t0 = min(t for (_, t) in data['pD'].keys())
 
-    for i in data['B']:
-        print(f"pD[{i}, {t0}] =", data['pD'].get((i, t0), 0))
+    # for i in data['B']:
+    #     print(f"pD[{i}, {t0}] =", data['pD'].get((i, t0), 0))
 
     # from pyomo.opt import SolverFactory, TerminationCondition
 
@@ -120,7 +92,7 @@ def main():
         print("\n=== System balance check ===")
         T_list = list(model.T)
 
-        for t in T_list[5000:5050]:
+        for t in T_list[0:50]:
             total_demand = sum(data['pD'].get((i, t), 0) for i in model.B)
             total_discharge = sum(model.pDIS[i, t].value for i in model.B)
             total_charge = sum(model.pCHA[i, t].value for i in model.B)
@@ -135,7 +107,7 @@ def main():
         T_list = list(model.T)
 
         for i in model.B:
-            soc_values = [model.E[i, t].value for t in T_list[:10]]
+            soc_values = [model.E[i, t].value for t in T_list[:50]]
             print(f"Bus {i}: {soc_values}")
 
 

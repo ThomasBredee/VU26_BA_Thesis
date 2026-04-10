@@ -16,47 +16,19 @@ def extract_network_data(net, verbose=False):
             - Pmax_sub
     """
 
-    # -----------------------------
-    # 1. Slack bus
-    # -----------------------------
     slack_bus = int(net.ext_grid.bus.iloc[0])
     B_prime = [slack_bus]
 
-    # -----------------------------
-    # 2. Buses (exclude slack)
-    # -----------------------------
     B = [int(b) for b in net.bus.index if int(b) != slack_bus]
+    L = [(int(row.from_bus), int(row.to_bus)) for _, row in net.line.iterrows()]
 
-    # -----------------------------
-    # 3. Lines
-    # -----------------------------
-    # L = [(int(row.from_bus), int(row.to_bus)) for _, row in net.line.iterrows()]
+    Pmax_line = {
+        (int(row.from_bus), int(row.to_bus)): 9200
+        for _, row in net.line.iterrows()
+    }
 
-    L = [#(0,1), 
-         (1,2), (2,3)]
-    Pmax_line = {#(0,1): 8000000,
-                 (1,2): 8000000,
-                 (2,3): 8000000
-                }
+    Pmax_sub = 1500 #{slack_bus: float(net.sn_mva)}
 
-
-    # -----------------------------
-    # 4. Line capacities (MW)
-    # -----------------------------
-    # Pmax_line = {
-    #     (int(row.from_bus), int(row.to_bus)):
-    #     float(np.sqrt(3) * net.bus.loc[row.from_bus, "vn_kv"] * row.max_i_ka)*1000000 #to go from MW, to W
-    #     for _, row in net.line.iterrows()
-    # }
-
-    # -----------------------------
-    # 5. Substation capacity
-    # -----------------------------
-    Pmax_sub = 150000 #{slack_bus: float(net.sn_mva)}
-
-    # -----------------------------
-    # 6. Output
-    # -----------------------------
     data = {
         'B': B,
         'B_prime': B_prime,
@@ -66,11 +38,29 @@ def extract_network_data(net, verbose=False):
     }
 
     if verbose:
-        print("\n=== NETWORK SUMMARY ===")
-        print(f"Number of buses: {len(net.bus)}")
-        print(f"Number of lines: {len(net.line)}")
-        print(f"Substation bus: {net.ext_grid.bus.iloc[0]}")
-        plot.simple_plot(net, plot_line_switches=False)
+        print("\n================ NETWORK DATA ================\n")
+
+        print("GENERAL INFO:")
+        print(f"  Total buses          : {len(net.bus)}")
+        print(f"  Total lines          : {len(net.line)}")
+        print(f"  Slack (substation)   : {slack_bus}")
+        print(f"  Distribution buses   : {B}")
+        print(f"  Substation set B'    : {B_prime}")
+        print()
+
+        print("LINES (Directed edges i -> j):")
+        for (i, j) in L:
+            print(f"  {i} -> {j}   | Pmax = {Pmax_line[(i,j)]}")
+        print()
+
+        print("===================================================\n")
+
+        # Optional plot
+        try:
+            import pandapower.plotting as plot
+            plot.simple_plot(net, plot_line_switches=False)
+        except:
+            print("Plotting failed (non-critical).")
 
     return data
 

@@ -1,13 +1,18 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from src.utils.plotting import (
+    plot_daily_average,
+    plot_hourly_pattern
+)
+
 # Will use:
 # https://opendata.cbs.nl/#/CBS/nl/dataset/83023NED/table?ts=1774355181788
 # E1C_AMI_A (demand - with PV)
 # E1C_AMI_I (PV generation)
 # E1C_AMI_A (demand - no PV)
 
-def load__demand_profile_percentages(filepath):
+def load__demand_profile_percentages(filepath, verbose=False):
     df = pd.read_csv(
         filepath,
         sep=';',
@@ -23,8 +28,13 @@ def load__demand_profile_percentages(filepath):
     profile = df[["van", "1.00_E1C_AMI_A"]]
     profile = profile.set_index("van")
 
-    # Return an resampled hourly percentage profile
-    return profile.resample("h").sum()
+    resampled_profile = profile.resample("h").sum()
+
+    if verbose:
+        plot_daily_average(profile),
+        plot_hourly_pattern(profile)
+
+    return resampled_profile
 
 
 

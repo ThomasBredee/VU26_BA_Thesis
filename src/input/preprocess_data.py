@@ -60,8 +60,7 @@ def build_pD(B, T, base_demand, profile, verbose=False):
     return pD
 
 
-
-def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=168):
+def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
     """
     Plot a smaller time window (default: 1 week = 168 hours)
     """
