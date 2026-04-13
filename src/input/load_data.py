@@ -12,7 +12,7 @@ from src.utils.plotting import (
 # E1C_AMI_I (PV generation)
 # E1C_AMI_A (demand - no PV)
 
-def load__demand_and_PV_profile_percentages(filepath, verbose=False):
+def load__demand_and_PV_profile_percentages(filepath, verbose_demand=False, verbose_PV=False):
     df = pd.read_csv(
         filepath,
         sep=';',
@@ -33,16 +33,19 @@ def load__demand_and_PV_profile_percentages(filepath, verbose=False):
     profile_PV = profile_PV.set_index("van")
     resampled_profile_PV = profile_PV.resample("h").sum()
 
+    resampled_profile = resampled_profile / resampled_profile.sum()
+    resampled_profile_PV = resampled_profile_PV / resampled_profile_PV.sum()
 
-    if verbose:
+    if verbose_demand:
         plot_daily_average(resampled_profile)
         plot_hourly_pattern(resampled_profile)
 
+    if verbose_PV:
         plot_daily_average(resampled_profile_PV)
         plot_hourly_pattern(resampled_profile_PV)
 
 
-    return resampled_profile, resampled_profile_PV
+    return resampled_profile, resampled_profile_PV.values.flatten()
 
 
 

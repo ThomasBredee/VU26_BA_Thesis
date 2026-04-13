@@ -139,3 +139,54 @@ def extract_results(model, results, max_print=10):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
+    # -----------------------------
+    # Extract PV data
+    # -----------------------------
+    PV_used = {i: [model.pPV_used[i, t].value for t in T_plot] for i in buses}
+    PV_curt = {i: [model.pPV_curt[i, t].value for t in T_plot] for i in buses}
+
+    # Optional: original PV (parameter)
+    PV_total = {i: [model.PV[i, t] for t in T_plot] for i in buses}
+
+    import numpy as np
+
+    PV_used_total = np.sum([PV_used[i] for i in buses], axis=0)
+    PV_curt_total = np.sum([PV_curt[i] for i in buses], axis=0)
+    PV_total_total = np.sum([PV_total[i] for i in buses], axis=0)
+
+
+
+    plt.figure(figsize=(12, 6))
+
+    plt.stackplot(
+        T_plot,
+        PV_used_total,
+        PV_curt_total,
+        labels=["PV Used", "PV Curtailed"],
+        alpha=0.8
+    )
+
+    # Optional: overlay total PV as line
+    plt.plot(T_plot, PV_total_total, linestyle='--', linewidth=2, label="Total PV")
+
+    plt.xlabel("Time")
+    plt.ylabel("Power / Energy")
+    plt.title("PV Utilization vs Curtailment")
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+

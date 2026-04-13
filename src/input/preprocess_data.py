@@ -5,6 +5,12 @@ def generate_base_demand(B, low=2500, high=3000, seed=None):
     rng = np.random.default_rng(seed)
     return {i: rng.uniform(low, high) for i in B}
 
+def generate_base_PV(B, PV, seed=None):
+    rng = np.random.default_rng(seed)
+    low = PV*0.9
+    high = PV*1.1
+    return {i: rng.uniform(low, high) for i in B}
+
 def normalize_profile(profile):
     values = profile.values.flatten()
     return values / values.sum()
@@ -59,6 +65,17 @@ def build_pD(B, T, base_demand, profile, verbose=False):
 
     return pD
 
+def build_PV(B, T, base_demand, profile, verbose=False):
+    PV = {}
+
+    for i in B:
+        for t_idx, t in enumerate(T):
+            PV[(i, t)] = base_demand[i] * profile[t_idx]
+
+    if verbose:
+        plot_bus_profiles_window(PV, B, T)
+
+    return PV
 
 def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
     """

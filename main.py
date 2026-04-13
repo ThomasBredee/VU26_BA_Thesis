@@ -5,12 +5,14 @@ from config import (
     CE, CP, SOC_MIN, SOC_MAX, GAMMA,
     HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
     ELECTRICITY_PRICE_CAP_AT_0,
+    PV_GENERATION, CURTAILMENT_COST
 )
 
 from src.input.extract_network import extract_network_data
 from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
-from src.input.preprocess_data import build_pD, generate_base_demand, plot_bus_profiles_window
+from src.input.preprocess_data import build_pD, build_PV, generate_base_demand, generate_base_PV
 from src.models.basic_model import build_model
+from src.models.model_PV import build_model_PV
 from src.utils.solver import solve_model, extract_results
 
 from src.utils.plotting import (
@@ -18,8 +20,6 @@ from src.utils.plotting import (
     plot_daily_average,
     plot_hourly_pattern
 )
-
-from pyomo.environ import SolverFactory
 
 def main():
     print('Starting pipeline................. \n')
@@ -33,7 +33,8 @@ def main():
 
     # # Demand: load generate base demands, extract percentages, concat into noisy profiles
     base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
-    demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose=False)
+    base_PV = generate_base_PV(data['B'], PV_GENERATION, seed=42)
+    demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
     data['pD'] = build_pD(
         B=data['B'],
@@ -43,6 +44,13 @@ def main():
         verbose=False
     )
 
+    data['PV'] = build_PV(
+        B=data['B'],
+        T=data['T'],
+        base_demand=base_PV,
+        profile=PV_data_percentages,
+        verbose=False
+    )
 
     price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, priced_capped=ELECTRICITY_PRICE_CAP_AT_0, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
@@ -52,8 +60,9 @@ def main():
     data['gamma'] = GAMMA
     data['SOC_min'] = SOC_MIN
     data['SOC_max'] = SOC_MAX
+    data['c_curt'] = CURTAILMENT_COST
 
-    model = build_model(data)
+    model = build_model_PV(data)
     
     results = solve_model(model)
     extract_results(model, results)
