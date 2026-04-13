@@ -194,31 +194,15 @@ def build_model(data):
     # Constraints
     # -------------------------
 
-    # # Linear relaxation of the model:
-    # def linear_relaxation(m, i):
-    #     return m.b[i] == 1
-    # model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
-
-
-   
-
-    # def power_balance_rule(m, i, t):
-    #     inflow = sum(m.P[j, i, t] for (j, i2) in m.L if i2 == i)
-    #     outflow = sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i)
-
-    #     if i == 1:  # <-- ONLY here
-    #         return m.p[i, t] == inflow - outflow + sum(m.P_sub[s, t] for s in m.B_prime)
-    #     else:
-    #         return m.p[i, t] == inflow - outflow
-    # def power_balance_rule(m, i, t):
-    #     inflow = sum(m.P[j, i, t] for (j, i2) in m.L if i2 == i)
-    #     outflow = sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i)
-
-    #     if i in m.B:
-    #         return m.p[i, t] == inflow - outflow
-    #     else:  # substation node
-    #         print("\n \n \n Made the substation constraint node thing!!!!!!!!!!!!!!!!!!!!!!!!!\n \n \n")
-    #         return sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i) == m.P_sub[i, t]
+    # # Linear relaxation of the model OR force battery placement somewhere:
+    def linear_relaxation(m, i):
+        if i == 1:
+            return m.b[i] == 0
+        if i == 2:
+            return m.b[i] == 0
+        if i == 3:
+            return m.b[i] == 1
+    model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
     
      # Net injection at each bus
     def net_injection_rule(m, i, t):
@@ -234,23 +218,9 @@ def build_model(data):
 
         return m.p[i, t] == inflow - outflow
     model.PowerBalance = Constraint(model.B, model.T, rule=power_balance_rule)
-    # model.PowerBalance = Constraint(model.B, model.T, rule=power_balance_rule)
-
-    # def power_balance_rule_substation(m, s, t):
-    #     # print("\n", m.P[s, 1, t], "=", m.P_sub[s, t], "\n")
-    #     return m.P[s, 1, t] == m.P_sub[s, t]
-    # model.PowerBalanceSubstation = Constraint(model.B_prime, model.T, rule=power_balance_rule_substation)
-
-
 
     # Line capacity limits
-    # def line_limit_rule(m, i, j, t):
-    #     return (-m.Pmax_line[i, j], m.P[i, j, t], m.Pmax_line[i, j])
-    # model.LineLimits = Constraint(model.L, model.T, rule=line_limit_rule)
     def line_limit_rule(m, i, j, t):
-        # if (i, j) == (0, 1):
-        #     return (0, m.P[i, j, t], m.Pmax_line[i, j])  # only forward flow
-        # else:
         return (-m.Pmax_line[i, j], m.P[i, j, t], m.Pmax_line[i, j])
     model.LineLimits = Constraint(model.L, model.T, rule=line_limit_rule)
 
@@ -332,8 +302,6 @@ def build_model(data):
         return m.Emax[i] >= 0.01 * m.b[i]
     model.MinEnergy = Constraint(model.B, rule=min_energy_rule)
 
-    
-    
 
     # Power-energy coupling: Pmax <= 0.25 * Emax
     def power_energy_coupling_rule(m, i):

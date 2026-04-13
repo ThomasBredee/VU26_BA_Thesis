@@ -12,7 +12,7 @@ from src.utils.plotting import (
 # E1C_AMI_I (PV generation)
 # E1C_AMI_A (demand - no PV)
 
-def load__demand_profile_percentages(filepath, verbose=False):
+def load__demand_and_PV_profile_percentages(filepath, verbose=False):
     df = pd.read_csv(
         filepath,
         sep=';',
@@ -27,18 +27,28 @@ def load__demand_profile_percentages(filepath, verbose=False):
 
     profile = df[["van", "1.00_E1C_AMI_A"]]
     profile = profile.set_index("van")
-
     resampled_profile = profile.resample("h").sum()
 
+    profile_PV = df[["van", "1.00_E1C_AMI_I"]]
+    profile_PV = profile_PV.set_index("van")
+    resampled_profile_PV = profile_PV.resample("h").sum()
+
+
     if verbose:
-        plot_daily_average(profile),
-        plot_hourly_pattern(profile)
+        plot_daily_average(resampled_profile)
+        plot_hourly_pattern(resampled_profile)
 
-    return resampled_profile
+        plot_daily_average(resampled_profile_PV)
+        plot_hourly_pattern(resampled_profile_PV)
+
+
+    return resampled_profile, resampled_profile_PV
 
 
 
-def plot_first_hours_prices(prices_df, n=200):
+
+
+def plot_first_hours_prices(prices_df, n=8760):
     plt.figure(figsize=(12, 5))
     plt.plot(prices_df.index[:n], prices_df['Price'][:n], marker='o', linestyle='-')
     plt.title(f"Electricity Prices — First {n} Hours")
@@ -49,11 +59,45 @@ def plot_first_hours_prices(prices_df, n=200):
     plt.tight_layout()
     plt.show()
 
+import matplotlib.pyplot as plt
+
+def plot_price_boxplot(df, verbose=True):
+    """
+    Create a boxplot of electricity prices to visualize distribution and outliers.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain a 'Price' column.
+    """
+
+    prices = df['Price'].values
+
+    plt.figure()
+    plt.boxplot(prices, vert=True, patch_artist=False)
+
+    plt.title("Electricity Price Distribution (Boxplot)")
+    plt.ylabel("Price (EUR/MWh)")
+    plt.xticks([1], ['Year'])
+
+    # Optional: print stats for deeper debugging
+    if verbose:
+        print("\n=== PRICE STATISTICS ===")
+        print(f"Min     : {prices.min():.2f}")
+        print(f"Q1      : {df['Price'].quantile(0.25):.2f}")
+        print(f"Median  : {df['Price'].median():.2f}")
+        print(f"Q3      : {df['Price'].quantile(0.75):.2f}")
+        print(f"Max     : {prices.max():.2f}")
+        print(f"Mean    : {prices.mean():.2f}")
+        print(f"Std dev : {prices.std():.2f}")
+
+    plt.show()
+
 def convert_series_to_dict(series, T):
     values = series.values.flatten()
     return {t: values[t] for t in T}
 
-def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
+def load_year_prices(filepath, year, priced_capped, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
     """
     Load hourly electricity prices from CSV and return only data for a specified year.
 
@@ -63,6 +107,9 @@ def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col=
         Path to the CSV file.
     year : int
         Year to filter (e.g., 2015).
+    price_capped : Bool
+        Yes: prices below 0 are set to 0.
+        No: no change to original price
     datetime_col : str, optional
         Name of the datetime column in the CSV, by default 'Datetime'.
     price_col : str, optional
@@ -90,8 +137,13 @@ def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col=
     df.set_index('Datetime', inplace=True)
     df.sort_index(inplace=True)
 
+    
+    if priced_capped:
+        df['Price'] = df['Price'].clip(lower=0)
+
     if verbose:
         plot_first_hours_prices(df)
+        plot_price_boxplot(df)
 
     return df
 

@@ -3,11 +3,12 @@ from config import (
     TIME,
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
     CE, CP, SOC_MIN, SOC_MAX, GAMMA,
-    HOUSE_MIN_USAGE, HOUSE_MAX_USAGE
+    HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
+    ELECTRICITY_PRICE_CAP_AT_0,
 )
 
 from src.input.extract_network import extract_network_data
-from src.input.load_data import load__demand_profile_percentages, load_year_prices, convert_series_to_dict
+from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
 from src.input.preprocess_data import build_pD, generate_base_demand, plot_bus_profiles_window
 from src.models.basic_model import build_model
 from src.utils.solver import solve_model, extract_results
@@ -25,25 +26,25 @@ def main():
 
     # Create network
     net = NETWORK_CHOICE() 
-    data = extract_network_data(net, verbose=True)
+    data = extract_network_data(net, verbose=False)
 
-    # Create time array
+    # # Create time array
     data['T'] = list(range(TIME))
 
-    # Demand: load generate base demands, extract percentages, concat into noisy profiles
+    # # Demand: load generate base demands, extract percentages, concat into noisy profiles
     base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
-    demand_data_percentages = load__demand_profile_percentages(DATA_PATH_DEMAND, verbose=True)
+    demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose=False)
     
     data['pD'] = build_pD(
         B=data['B'],
         T=data['T'],
         base_demand=base_demand,
         profile=demand_data_percentages,
-        verbose=True
+        verbose=False
     )
 
 
-    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=True)
+    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, priced_capped=ELECTRICITY_PRICE_CAP_AT_0, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
 
     data['cP'] = CP
@@ -53,36 +54,7 @@ def main():
     data['SOC_max'] = SOC_MAX
 
     model = build_model(data)
-    # print("Pmax_sub: ", data['Pmax_sub'])
     
-
-    # print("B: ", data['B'])
-    # print("B_prime: ", data['B_prime'])
-    # print("L: ", data['L'])
-
-    # t0 = min(t for (_, t) in data['pD'].keys())
-
-    # for i in data['B']:
-    #     print(f"pD[{i}, {t0}] =", data['pD'].get((i, t0), 0))
-
-    # from pyomo.opt import SolverFactory, TerminationCondition
-
-    # solver = SolverFactory('gurobi_persistent')
-    # solver.set_instance(model)
-    # results = solver.solve(tee=True)
-    # if results.solver.termination_condition in [
-    #     TerminationCondition.infeasible,
-    #     TerminationCondition.infeasibleOrUnbounded
-    # ]:
-    #     print("\nModel infeasible — computing IIS...\n")
-    #     gurobi_model = solver._solver_model
-    #     gurobi_model.computeIIS()
-    #     gurobi_model.write("model.ilp")
-    #     print("IIS written to model.ilp")
-
-    
-
-    #DEZE UITEINDLEIJK WEER AANZETTEN!!!
     results = solve_model(model)
     extract_results(model, results)
 
@@ -114,8 +86,6 @@ def main():
 
     print("Pipeline executed successfully.")
 
-        
-
-
+     
 if __name__ == "__main__":
     main()
