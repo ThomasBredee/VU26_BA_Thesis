@@ -10,7 +10,7 @@ from config import (
 
 from src.input.extract_network import extract_network_data
 from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
-from src.input.preprocess_data import build_pD, build_PV, generate_base_demand, generate_base_PV
+from src.input.preprocess_data import build_pD, build_PV, generate_base_demand, generate_base_PV, network_limits
 from src.models.basic_model import build_model
 from src.models.model_PV import build_model_PV
 from src.utils.solver import solve_model, extract_results
@@ -44,6 +44,8 @@ def main():
         verbose=False
     )
 
+    data['Pmax_line'], data['Pmax_sub'] = network_limits(B=data['B'], L=data['L'], T=data['T'], pD=data['pD'], verbose=True)
+
     data['PV'] = build_PV(
         B=data['B'],
         T=data['T'],
@@ -54,20 +56,29 @@ def main():
 
     price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, priced_capped=ELECTRICITY_PRICE_CAP_AT_0, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
+    c_values = list(data['c'].values())
+    avg_price = sum(c_values) / len(c_values)
 
     data['cP'] = CP
     data['cE'] = CE
     data['gamma'] = GAMMA
     data['SOC_min'] = SOC_MIN
     data['SOC_max'] = SOC_MAX
-    data['c_curt'] = CURTAILMENT_COST
+    data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
 
     model = build_model_PV(data)
-    
+
     results = solve_model(model)
+
+    # print("\n=== PV vs Demand comparison ===\n")
+    # for t in model.T:
+    #     total_PV = sum(model.PV[i,t] for i in model.B)
+#     total_demand = sum(model.pD[i,t] for i in model.B)
+    #     print(t, total_PV, total_demand)
+
     extract_results(model, results)
 
-    #Testing::
+    #Testing:
     system_balance_check = False
     if system_balance_check:
         print("\n=== System balance check ===")

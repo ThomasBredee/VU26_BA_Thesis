@@ -60,10 +60,38 @@ def build_pD(B, T, base_demand, profile, verbose=False):
         for t_idx, t in enumerate(T):
             pD[(bus, t)] = base_demand[bus] * noisy_profile[t_idx]
 
+    for t in list(T)[:50]:
+        print(f"t={t}: {pD[(1, t)]}")
+
     if verbose:
         plot_bus_profiles_window(pD, B, T)
 
     return pD
+
+def network_limits(B, L, T, pD, line_factor=5.0, substation_factor=1.2, verbose=False):
+
+    total_demand_t = {}
+
+    for t in T:
+        total = sum(pD[(i, t)] for i in B)
+        total_demand_t[t] = total
+
+    peak_demand = max(total_demand_t.values())
+
+    if verbose:
+        print(f"Peak demand: {peak_demand:.2f} kW")
+
+    line_capacity = line_factor * peak_demand
+    Pmax_line = {(i, j): line_capacity for (i, j) in L}
+
+    Pmax_sub_value = substation_factor * peak_demand
+    Pmax_sub = {0: Pmax_sub_value}
+
+    if verbose:
+        print(f"Line capacity: {line_capacity:.2f} kW")
+        print(f"Substation capacity: {Pmax_sub_value:.2f} kW")
+
+    return Pmax_line, Pmax_sub
 
 def build_PV(B, T, base_demand, profile, verbose=False):
     PV = {}
@@ -77,7 +105,7 @@ def build_PV(B, T, base_demand, profile, verbose=False):
 
     return PV
 
-def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
+def plot_bus_profiles_window(pD, B, T, n_buses=10, start=0, horizon=300):
     """
     Plot a smaller time window (default: 1 week = 168 hours)
     """

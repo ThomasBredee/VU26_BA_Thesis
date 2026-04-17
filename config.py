@@ -1,9 +1,9 @@
 import pandapower.networks as pn
 
-NETWORK_CHOICE = pn.simple_four_bus_system
+NETWORK_CHOICE = pn.case33bw#case30#simple_four_bus_system##
 TIME = 8760
 
-ELECTRICITY_PRICE_CAP_AT_0 = True
+ELECTRICITY_PRICE_CAP_AT_0 = False
 # NOISE_LEVEL = 0.02
 # # RESAMPLE_FREQ = "h"
 
@@ -21,4 +21,4 @@ HOUSE_MIN_USAGE = 2500
 HOUSE_MAX_USAGE = 3500
 
 PV_GENERATION = 500 
-CURTAILMENT_COST = -115 #RANDOM NUM STILL.. TODO: 
+CURTAILMENT_COST = 40 #RANDOM NUM STILL.. TODO: 

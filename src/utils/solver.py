@@ -86,7 +86,7 @@ def extract_results(model, results, max_print=10):
     # -----------------------------
     # Settings
     # -----------------------------
-    T_plot = list(model.T)[:1000]  # first 1000 timesteps
+    T_plot = list(model.T)[3000:3750]  # first 1000 timesteps
     buses = list(model.B)           # battery buses
     substations = list(model.B_prime)
 
@@ -104,7 +104,7 @@ def extract_results(model, results, max_print=10):
         plt.plot(T_plot, SOC[i], label=f'Bus {i} SOC')
     plt.xlabel('Time [t]')
     plt.ylabel('State of Charge [E]')
-    plt.title('Battery SOC over time (first 1000 timesteps)')
+    plt.title('Battery SOC over time (Timesteps 3000 to 3750 (hours))')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()

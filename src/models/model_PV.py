@@ -14,8 +14,8 @@ def build_model_PV(data):
     # print(data['MP'], data['ME'])
 
 
-    MP = {i: 250 for i in data['B']} #TODO: stond eerst op 6 stiill needs to be adjusted!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ME = {i: 700 for i in data['B']}
+    MP = {i: 450 for i in data['B']} 
+    ME = {i: 7000 for i in data['B']} 
     data['MP'] = MP
     data['ME'] = ME
 
@@ -68,7 +68,7 @@ def build_model_PV(data):
     model.ME = Param(model.B, initialize=data['ME'])  # Big-M energy per bus
 
     model.PV = Param(model.B, model.T, initialize=data['PV'], default=0)
-    model.c_curt = Param(initialize=data['c_curt'])  # €/MWh penalty
+    model.c_curt = Param(model.T, initialize=data['c_curt'])  # €/kWh penalty
 
     # -------------------------
     # Variables
@@ -98,29 +98,34 @@ def build_model_PV(data):
         investment_cost = sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        operation_cost = 0.1*sum(
+        degradation_penalty = 0.1*sum(
             m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
         )
-        curtailment_cost = sum(
-            m.c_curt * m.pPV_curt[i, t]
+        curtailment_penalty = sum(
+            m.c_curt[t] * m.pPV_curt[i, t]
             for i in m.B for t in m.T
         )
-        return energy_cost + investment_cost + operation_cost + curtailment_cost
+        return energy_cost + investment_cost + degradation_penalty + curtailment_penalty
     model.OBJ = Objective(rule=obj_rule, sense=minimize)
 
     # -------------------------
     # Constraints
     # -------------------------
 
-    # # Linear relaxation of the model OR force battery placement somewhere:
-    def linear_relaxation(m, i):
-        if i == 1:
-            return m.b[i] == 0
-        if i == 2:
-            return m.b[i] == 0
-        if i == 3:
+    # # Fixing batteries of the model OR force battery placement somewhere:
+    def fixing_batteries(m, i):
+        if i == 3 or 4 or 5:
             return m.b[i] == 1
-    model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
+        elif i != 3:
+            return m.b[i] == 0
+    model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
+        
+
+    # FOR MESHED NETWORKS, ADD THIS CONSTRAINT
+    def global_balance_rule(m, t):
+        return sum(m.p[i, t] for i in m.B) == 0
+    model.GlobalBalance = Constraint(model.T, rule=global_balance_rule)
+
 
     #PV linking:
     def pv_split_rule(m, i, t):

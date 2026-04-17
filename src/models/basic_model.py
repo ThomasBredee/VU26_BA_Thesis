@@ -194,14 +194,12 @@ def build_model(data):
     # Constraints
     # -------------------------
 
-    # # Linear relaxation of the model OR force battery placement somewhere:
+    # Linear relaxation of the model OR force battery placement somewhere:
     def linear_relaxation(m, i):
-        if i == 1:
-            return m.b[i] == 0
-        if i == 2:
-            return m.b[i] == 0
-        if i == 3:
+        if i == 5:
             return m.b[i] == 1
+        elif i != 5:
+            return m.b[i] == 0
     model.LinearRelaxation = Constraint(model.B, rule = linear_relaxation)
     
      # Net injection at each bus
