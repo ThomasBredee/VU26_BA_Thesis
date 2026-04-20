@@ -13,13 +13,6 @@ def build_model_PV(data):
 
     # print(data['MP'], data['ME'])
 
-
-    MP = {i: 450 for i in data['B']} 
-    ME = {i: 7000 for i in data['B']} 
-    data['MP'] = MP
-    data['ME'] = ME
-
-
     """
     Build a Pyomo MILP model including an explicit substation bus.
 
@@ -32,7 +25,7 @@ def build_model_PV(data):
         - T: list of time intervals
         - pD: dict {(i,t): demand}
         - c: dict {t: price}
-        - cP, cE, gamma: battery costs and operational weight
+        - cP, cE: battery costs for Power and Energy
         - SOC_min, SOC_max: SOC limits
         - MP, ME: Big-M parameters (can be precomputed)
     """
@@ -98,14 +91,14 @@ def build_model_PV(data):
         investment_cost = sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        degradation_penalty = 0.1*sum(
-            m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
-        )
+        # degradation_penalty = 0.000001*sum(
+        #     m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
+        # )
         curtailment_penalty = sum(
             m.c_curt[t] * m.pPV_curt[i, t]
             for i in m.B for t in m.T
         )
-        return energy_cost + investment_cost + degradation_penalty + curtailment_penalty
+        return energy_cost + investment_cost + curtailment_penalty # degradation_penalty +
     model.OBJ = Objective(rule=obj_rule, sense=minimize)
 
     # -------------------------
@@ -114,12 +107,19 @@ def build_model_PV(data):
 
     # # Fixing batteries of the model OR force battery placement somewhere:
     def fixing_batteries(m, i):
-        if i == 3 or 4 or 5:
+        if i in []:
             return m.b[i] == 1
-        elif i != 3:
+        else:
             return m.b[i] == 0
     model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
-        
+
+    # #OR this battery rule:
+    # def battery_budget_rule(m):
+    #     return sum(m.b[i] for i in m.B) <= 4
+    # model.BatteryBudget = Constraint(rule=battery_budget_rule)
+    
+
+
 
     # FOR MESHED NETWORKS, ADD THIS CONSTRAINT
     def global_balance_rule(m, t):
@@ -166,7 +166,7 @@ def build_model_PV(data):
             return m.E[i, t] == 0.5 * m.Emax[i]
         else:
             t_prev = m.T.prev(t)
-            return m.E[i, t] == m.E[i, t_prev] + m.pCHA[i, t] - m.pDIS[i, t]
+            return m.E[i, t] == m.E[i, t_prev] + 0.95 * m.pCHA[i, t] - 0.95 * m.pDIS[i, t] #added the 95% efficiency coefficients.
     model.SOC = Constraint(model.B, model.T, rule=soc_rule)
 
     def soc_cycle_rule(m, i):

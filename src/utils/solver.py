@@ -2,7 +2,7 @@ from pyomo.environ import SolverFactory, value
 import matplotlib.pyplot as plt
 import numpy as np
 
-def solve_model(model, tee=True):
+def solve_model(model, tee=False):
     solver = SolverFactory("gurobi")
 
     # Optional solver settings
@@ -77,7 +77,8 @@ def extract_results(model, results, max_print=10):
         try:
             Pmax = value(model.Pmax[i]) or 0
             Emax = value(model.Emax[i]) or 0
-            print(f"Bus {i}: Pmax={Pmax:.2f}, Emax={Emax:.2f}")
+            if Emax != 0:
+                print(f"Bus {i}: Pmax={Pmax:.2f}, Emax={Emax:.2f}")
         except:
             print(f"Bus {i}: ERROR")
 
@@ -177,6 +178,75 @@ def extract_results(model, results, max_print=10):
     plt.grid(True)
 
     plt.tight_layout()
+    plt.show()
+
+
+    energy_cost = sum(
+        value(model.c[t]) * sum(value(model.P_sub[s, t]) for s in model.B_prime)
+        for t in model.T
+    )
+    investment_cost = sum(
+        value(model.cP) * value(model.Pmax[i]) + value(model.cE) * value(model.Emax[i])
+        for i in model.B
+    )
+    degradation_penalty = 0.1 * sum(
+        value(model.pCHA[i, t]) + value(model.pDIS[i, t])
+        for i in model.B for t in model.T
+    )
+    curtailment_penalty = sum(
+        value(model.c_curt[t]) * value(model.pPV_curt[i, t])
+        for i in model.B for t in model.T
+    )
+    total_objective = value(model.OBJ)
+
+    print("===== OBJECTIVE BREAKDOWN =====")
+    print("Energy cost ($)     :", round(energy_cost,2))
+    print("Investment cost ($) :", round(investment_cost,2))
+    print("Degradation cost    :", degradation_penalty)
+    print("Curtailment cost    :", curtailment_penalty)
+    print("--------------------------------")
+    print("TOTAL OBJECTIVE     :", total_objective)
+
+    total_curtailment = sum(
+        value(model.pPV_curt[i, t])
+        for i in model.B for t in model.T
+    )
+
+    total_energy_price = sum(
+        value(model.c[t])
+        for t in model.T
+    )
+
+    print("===== OVERALL RESULTS =====")
+    print("Total PV curtailed:", total_curtailment)
+    print("Sum of energy prices:", total_energy_price)
+
+    T_list = list(model.T)
+
+    curtailment_ts = []
+    price_ts = []
+
+    for t in T_list:
+        curt = sum(value(model.pPV_curt[i, t]) for i in model.B)
+        price = value(model.c[t])
+
+        curtailment_ts.append(curt)
+        price_ts.append(price)
+
+    fig, ax1 = plt.subplots(figsize=(18, 5))
+
+    # PV curtailment
+    ax1.plot(T_list, curtailment_ts, color='tab:orange', label='PV Curtailment')
+    ax1.set_ylabel("PV Curtailment (kW)")
+    ax1.set_xlabel("Time step")
+
+    # Price on second axis
+    ax2 = ax1.twinx()
+    ax2.plot(T_list, price_ts, color='tab:blue', alpha=0.6, label='Energy Price')
+    ax2.set_ylabel("Energy Price")
+
+    plt.title("PV Curtailment vs Energy Price (first 1000 timesteps)")
+    fig.tight_layout()
     plt.show()
 
 

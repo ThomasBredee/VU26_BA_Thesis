@@ -60,15 +60,28 @@ def build_pD(B, T, base_demand, profile, verbose=False):
         for t_idx, t in enumerate(T):
             pD[(bus, t)] = base_demand[bus] * noisy_profile[t_idx]
 
-    for t in list(T)[:50]:
-        print(f"t={t}: {pD[(1, t)]}")
-
     if verbose:
         plot_bus_profiles_window(pD, B, T)
 
     return pD
 
-def network_limits(B, L, T, pD, line_factor=5.0, substation_factor=1.2, verbose=False):
+def calculate_Big_M(B, T, pD, verbose=False):
+    ME = {}
+    MP = {}
+
+    for i in B:
+        total_demand = sum(pD.get((i, t), 0) for t in T)
+        ME[i] = 0.05 * total_demand
+        MP[i] = 0.25 * ME[i] # making sure its an 4 hour battery
+    if verbose:
+        print("\n === Big-M Calculation === \n")
+        print("ME is: ", ME[1])
+        print("MP is: ", MP[1])
+
+    return ME, MP
+
+
+def network_limits(B, L, T, pD, line_factor=5.0, substation_factor=1, verbose=False):
 
     total_demand_t = {}
 
