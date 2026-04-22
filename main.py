@@ -26,13 +26,13 @@ def main():
 
     # Create network
     net = NETWORK_CHOICE() 
-    data = extract_network_data(net, verbose=False)
+    data , base_demand = extract_network_data(net, verbose=False)
 
     # # Create time array
     data['T'] = list(range(TIME))
 
     # # Demand: load generate base demands, extract percentages, concat into noisy profiles
-    base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
+    # base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
     base_PV = generate_base_PV(data['B'], PV_GENERATION, seed=42)
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
@@ -44,7 +44,7 @@ def main():
         verbose=False
     )
 
-    data['Pmax_line'], data['Pmax_sub'] = network_limits(B=data['B'], L=data['L'], T=data['T'], pD=data['pD'], verbose=True)
+    # data['Pmax_line'], data['Pmax_sub'] = network_limits(B=data['B'], L=data['L'], T=data['T'], pD=data['pD'], verbose=False)
 
     data['PV'] = build_PV(
         B=data['B'],
@@ -63,21 +63,18 @@ def main():
     data['SOC_min'] = SOC_MIN
     data['SOC_max'] = SOC_MAX
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
-
+        #t: 100000 for t in data['T']}
 
     data['ME'], data['MP'] = calculate_Big_M(data['B'], data['T'], data['pD'], verbose = False)
 
     model = build_model_PV(data)
 
-    results = solve_model(model, tee=False)
+    results = solve_model(model, tee=True)
 
-    # print("\n=== PV vs Demand comparison ===\n")
-    # for t in model.T:
-    #     total_PV = sum(model.PV[i,t] for i in model.B)
-    #     total_demand = sum(model.pD[i,t] for i in model.B)
-    #     print(t, total_PV, total_demand)
+    extract_results(model, results, data)
 
-    extract_results(model, results)
+
+
 
     #Testing:
     system_balance_check = False
@@ -97,11 +94,11 @@ def main():
                 f"battery_net={net_battery:.2f}, "
                 f"substation={total_sub:.2f}")
         
-        T_list = list(model.T)
+        # T_list = list(model.T)
 
-        for i in model.B:
-            soc_values = [model.E[i, t].value for t in T_list[:50]]
-            print(f"Bus {i}: {soc_values}")
+        # for i in model.B:
+        #     soc_values = [model.E[i, t].value for t in T_list[:50]]
+        #     print(f"Bus {i}: {soc_values}")
 
 
 

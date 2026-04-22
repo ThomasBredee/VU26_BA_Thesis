@@ -1,6 +1,10 @@
 from pyomo.environ import SolverFactory, value
 import matplotlib.pyplot as plt
 import numpy as np
+import math
+from pyomo.environ import value
+from pyomo.opt import TerminationCondition
+
 
 def solve_model(model, tee=False):
     solver = SolverFactory("gurobi")
@@ -13,11 +17,9 @@ def solve_model(model, tee=False):
 
     return results
 
-from pyomo.environ import value
-from pyomo.opt import TerminationCondition
 
 
-def extract_results(model, results, max_print=10):
+def extract_results(model, results, data, max_print=10):
     """
     Safely extract and print results from a solved Pyomo model.
     """
@@ -150,7 +152,6 @@ def extract_results(model, results, max_print=10):
     # Optional: original PV (parameter)
     PV_total = {i: [model.PV[i, t] for t in T_plot] for i in buses}
 
-    import numpy as np
 
     PV_used_total = np.sum([PV_used[i] for i in buses], axis=0)
     PV_curt_total = np.sum([PV_curt[i] for i in buses], axis=0)
@@ -249,6 +250,84 @@ def extract_results(model, results, max_print=10):
     fig.tight_layout()
     plt.show()
 
+
+
+    T = list(model.T)
+    lines_from_1 = [(i, j) for (i, j) in model.L if i == 1]
+
+    n = len(lines_from_1)
+    cols = 2
+    rows = math.ceil(n / cols)
+
+    fig, axes = plt.subplots(rows, cols, figsize=(12, 4 * rows))
+    axes = axes.flatten()
+
+    for idx, (i, j) in enumerate(lines_from_1):
+        ax = axes[idx]
+
+        flow = [value(model.P[i, j, t]) for t in T]
+        cap = data['Pmax_line'][(i, j)]
+
+        ax.plot(T, flow)
+
+        ax.hlines(cap, T[0], T[-1], linestyles='dotted')
+        ax.hlines(-cap, T[0], T[-1], linestyles='dotted')
+
+        ax.set_title(f"({i} → {j})")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Power")
+        ax.grid(True)
+
+    # remove unused subplots
+    for k in range(len(lines_from_1), len(axes)):
+        fig.delaxes(axes[k])
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+    T = list(model.T)
+    # lines_from_1 = [(i, j) for (i, j) in model.L if i == 1]
+    lines_from_1 = [(i, j) for (i, j) in model.L if i == 1]
+
+    lines_from_32 = [(i, j) for (i, j) in model.L if i == 32 or j == 32]
+
+    lines_selected = lines_from_1 + lines_from_32
+
+    for (i, j) in lines_selected:
+        flow = [value(model.P[i, j, t]) for t in T]
+        cap = data['Pmax_line'][(i, j)]
+
+        plt.figure(figsize=(10, 4))
+
+        plt.plot(T, flow, label=f"P({i},{j})")
+
+        # capacity bounds
+        plt.hlines(cap, T[0], T[-1], linestyles='dotted')
+        plt.hlines(-cap, T[0], T[-1], linestyles='dotted')
+
+        # detect overload
+        threshold = 0.9 * cap
+        overload = [abs(f) > threshold for f in flow]
+
+        plt.hlines(threshold, T[0], T[-1], linestyles='dashed')
+        plt.hlines(-threshold, T[0], T[-1], linestyles='dashed')
+
+        # highlight regions
+        for k in range(len(T)):
+            if overload[k]:
+                plt.axvspan(T[k], T[k] + 1, alpha=0.3)
+
+        plt.title(f"Line ({i} → {j}) with Overload Highlight")
+        plt.xlabel("Time")
+        plt.ylabel("Power Flow")
+        plt.legend()
+        plt.grid(True)
+
+        plt.show()
 
 
 

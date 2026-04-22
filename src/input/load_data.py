@@ -49,11 +49,9 @@ def load__demand_and_PV_profile_percentages(filepath, verbose_demand=False, verb
 
 
 
-
-
-def plot_first_hours_prices(prices_df, n=8760):
+def plot_first_hours_prices(prices_df, n=4385):
     plt.figure(figsize=(12, 5))
-    plt.plot(prices_df.index[:n], prices_df['Price'][:n], marker='o', linestyle='-')
+    plt.plot(prices_df.index[:n], prices_df['Price'][:n], linestyle='-')
     plt.title(f"Electricity Prices — First {n} Hours")
     plt.xlabel("Datetime")
     plt.ylabel("Price [EUR/MWhe]")
@@ -61,8 +59,6 @@ def plot_first_hours_prices(prices_df, n=8760):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
-
-import matplotlib.pyplot as plt
 
 def plot_price_boxplot(df, verbose=True):
     """
@@ -140,6 +136,8 @@ def load_year_prices(filepath, year, priced_capped, datetime_col='Datetime (Loca
     df.set_index('Datetime', inplace=True)
     df.sort_index(inplace=True)
 
+    # Convert the electricity prices from MWh to kWh 
+    df['Price'] = df['Price'] / 1000
     
     if priced_capped:
         df['Price'] = df['Price'].clip(lower=0)

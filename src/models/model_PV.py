@@ -38,7 +38,6 @@ def build_model_PV(data):
     # -------------------------
     model.B = Set(initialize=data['B'])                    # distribution buses, set: [1,2,3,....]
     model.B_prime = Set(initialize=data['B_prime'])        # substation bus(es), set: [0]
-    # TOO General... model.L = Set(within=(model.B | model.B_prime) * (model.B | model.B_prime), initialize=data['L'])  # lines (i,j)
     model.L = Set(dimen=2, initialize=data['L'])
     model.T = Set(initialize=data['T'])                    # time intervals, t=[0, 1, 2, ..., 8759]
 
@@ -52,7 +51,6 @@ def build_model_PV(data):
 
     model.cP = Param(initialize=data['cP'])                                 # battery power cost
     model.cE = Param(initialize=data['cE'])                                 # battery energy cost
-    model.gamma = Param(initialize=data['gamma'])                            # battery operation weight 
 
     model.SOC_min = Param(initialize=data['SOC_min'])     # SOC minimum for batteries
     model.SOC_max = Param(initialize=data['SOC_max'])     # SOC maximum for batteries
@@ -91,14 +89,14 @@ def build_model_PV(data):
         investment_cost = sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        # degradation_penalty = 0.000001*sum(
-        #     m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
-        # )
+        degradation_penalty = sum(
+            m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
+        )
         curtailment_penalty = sum(
             m.c_curt[t] * m.pPV_curt[i, t]
             for i in m.B for t in m.T
         )
-        return energy_cost + investment_cost + curtailment_penalty # degradation_penalty +
+        return energy_cost + investment_cost + curtailment_penalty + degradation_penalty
     model.OBJ = Objective(rule=obj_rule, sense=minimize)
 
     # -------------------------
@@ -107,7 +105,7 @@ def build_model_PV(data):
 
     # # Fixing batteries of the model OR force battery placement somewhere:
     def fixing_batteries(m, i):
-        if i in []:
+        if i in [17]: #17 is the furtherst away
             return m.b[i] == 1
         else:
             return m.b[i] == 0
@@ -115,7 +113,7 @@ def build_model_PV(data):
 
     # #OR this battery rule:
     # def battery_budget_rule(m):
-    #     return sum(m.b[i] for i in m.B) <= 4
+    #     return sum(m.b[i] for i in m.B) <= 1
     # model.BatteryBudget = Constraint(rule=battery_budget_rule)
     
 

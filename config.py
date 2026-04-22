@@ -20,4 +20,4 @@ SOC_MAX = 0.8
 HOUSE_MIN_USAGE = 2500
 HOUSE_MAX_USAGE = 3500
 
-PV_GENERATION = 500 
+PV_GENERATION = 500*200 #500kWh, for about 200 households in the bus. 

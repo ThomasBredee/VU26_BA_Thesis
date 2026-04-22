@@ -5,11 +5,26 @@ def generate_base_demand(B, low=2500, high=3000, seed=None):
     rng = np.random.default_rng(seed)
     return {i: rng.uniform(low, high) for i in B}
 
-def generate_base_PV(B, PV, seed=None):
+import numpy as np
+
+def generate_base_PV(B, PV_capacity, n_pv=8, seed=42):
+
     rng = np.random.default_rng(seed)
-    low = PV*0.9
-    high = PV*1.1
-    return {i: rng.uniform(low, high) for i in B}
+    B = list(B)
+
+    pv_buses = set(
+        rng.choice(B, size=min(n_pv, len(B)), replace=False)
+    )
+
+    low = PV_capacity * 0.9
+    high = PV_capacity * 1.1
+
+    pv_dict = {
+        int(bus): float(rng.uniform(low, high)) if bus in pv_buses else 0.0
+        for bus in B
+    }
+
+    return pv_dict
 
 def normalize_profile(profile):
     values = profile.values.flatten()
@@ -118,7 +133,7 @@ def build_PV(B, T, base_demand, profile, verbose=False):
 
     return PV
 
-def plot_bus_profiles_window(pD, B, T, n_buses=10, start=0, horizon=300):
+def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
     """
     Plot a smaller time window (default: 1 week = 168 hours)
     """
