@@ -29,6 +29,7 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     B = [int(b) for b in net.bus.index if int(b) != slack_bus]
 
+    print(net)
     # ---------------------------
     # Lines (edges)
     # ---------------------------
@@ -60,7 +61,7 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     # Line capacities (kW)
     # ---------------------------
-    net.line["max_i_ka"] = 0.2
+    net.line["max_i_ka"] = 0.5
 
     Pmax_line = {}
 
@@ -80,7 +81,7 @@ def extract_network_data(net, verbose=False):
             I_max = row.max_i_ka  # kA
             V_kv = net.bus.vn_kv.at[i]
 
-            S_max_MVA = (3 ** 0.5) * V_kv * I_max
+            S_max_MVA = (3 ** 0.5) * V_kv * I_max #standard approxiamation --> check the constant
             Pmax_line[(i, j)] = S_max_MVA * 1000  # kW
 
     # ---------------------------
@@ -144,102 +145,94 @@ def extract_network_data(net, verbose=False):
 
         print("=================================================\n")
 
-        # Optional plot
-        try:
-            import pandapower.plotting as plot
-            plot.simple_plot(net, plot_line_switches=False)
-        except:
-            print("Plotting failed (non-critical).")
-
-
     
 
 
 
 
 
-    # pLotting the network.......................
-    import pandas as pd
+        # pLotting the network.......................
+        import pandas as pd
 
-    coords = {}
+        coords = {}
 
-    # -------------------------
-    # MAIN CHAIN: 1 → 17 (horizontal line)
-    # -------------------------
-    for i in range(1, 18):
-        coords[i] = (i, 0)
+        # -------------------------
+        # MAIN CHAIN: 1 → 17 (horizontal line)
+        # -------------------------
+        for i in range(1, 18):
+            coords[i] = (i, 0)
 
-    # -------------------------
-    # BRANCH: 1 → 18 → 21 (upper branch)
-    # -------------------------
-    coords[18] = (1, 1)
-    coords[19] = (2, 1)
-    coords[20] = (3, 1)
-    coords[21] = (4, 1)
+        # -------------------------
+        # BRANCH: 1 → 18 → 21 (upper branch)
+        # -------------------------
+        coords[18] = (1, 1)
+        coords[19] = (2, 1)
+        coords[20] = (3, 1)
+        coords[21] = (4, 1)
 
-    # -------------------------
-    # BRANCH: 2 → 22 → 24 (upper-mid branch)
-    # -------------------------
-    coords[22] = (2, -2)
-    coords[23] = (3, -2)
-    coords[24] = (4, -2)
+        # -------------------------
+        # BRANCH: 2 → 22 → 24 (upper-mid branch)
+        # -------------------------
+        coords[22] = (2, -2)
+        coords[23] = (3, -2)
+        coords[24] = (4, -2)
 
-    # -------------------------
-    # LONG BRANCH: 5 → 25 → 32 (lower branch)
-    # -------------------------
-    for idx, bus in enumerate(range(25, 33)):
-        coords[bus] = (5 + idx, -1)
+        # -------------------------
+        # LONG BRANCH: 5 → 25 → 32 (lower branch)
+        # -------------------------
+        for idx, bus in enumerate(range(25, 33)):
+            coords[bus] = (5 + idx, -1)
 
-    # -------------------------
-    # FIX CROSS CONNECTION TARGETS (ensure alignment looks good)
-    # -------------------------
-    coords[7]  = (7, 0)
-    coords[8]  = (8, 0)
-    coords[11] = (11, 0)
-    coords[14] = (14, 0)
-    coords[17] = (17, 0)
+        # -------------------------
+        # FIX CROSS CONNECTION TARGETS (ensure alignment looks good)
+        # -------------------------
+        coords[7]  = (7, 0)
+        coords[8]  = (8, 0)
+        coords[11] = (11, 0)
+        coords[14] = (14, 0)
+        coords[17] = (17, 0)
 
-    coords[28] = (8, -1)
+        coords[28] = (8, -1)
 
-    # -------------------------
-    # SUBSTATION NODE (0)
-    # -------------------------
-    coords[0] = (0, 0)
+        # -------------------------
+        # SUBSTATION NODE (0)
+        # -------------------------
+        coords[0] = (0, 0)
 
 
-    bus_geodata = pd.DataFrame.from_dict(coords, orient='index', columns=["x", "y"])
+        bus_geodata = pd.DataFrame.from_dict(coords, orient='index', columns=["x", "y"])
 
-    import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
 
-    plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(10, 5))
 
-    # draw nodes
-    for bus, (x, y) in coords.items():
-        plt.scatter(x, y, s=120)
-        plt.text(x, y, str(bus),
-                ha='center', va='center',
-                fontsize=9,
-                bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        # draw nodes
+        for bus, (x, y) in coords.items():
+            plt.scatter(x, y, s=120)
+            plt.text(x, y, str(bus),
+                    ha='center', va='center',
+                    fontsize=9,
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
-    # draw edges
-    edges = [
-        (1,2),(2,3),(3,4),(4,5),(5,6),(6,7),(7,8),(8,9),
-        (9,10),(10,11),(11,12),(12,13),(13,14),(14,15),
-        (15,16),(16,17),
-        (1,18),(18,19),(19,20),(20,21),
-        (2,22),(22,23),(23,24),
-        (5,25),(25,26),(26,27),(27,28),(28,29),(29,30),(30,31),(31,32),
-    ]
+        # draw edges
+        edges = [
+            (1,2),(2,3),(3,4),(4,5),(5,6),(6,7),(7,8),(8,9),
+            (9,10),(10,11),(11,12),(12,13),(13,14),(14,15),
+            (15,16),(16,17),
+            (1,18),(18,19),(19,20),(20,21),
+            (2,22),(22,23),(23,24),
+            (5,25),(25,26),(26,27),(27,28),(28,29),(29,30),(30,31),(31,32),
+        ]
 
-    for i, j in edges:
-        x1, y1 = coords[i]
-        x2, y2 = coords[j]
-        plt.plot([x1, x2], [y1, y2], 'k-', linewidth=1)
+        for i, j in edges:
+            x1, y1 = coords[i]
+            x2, y2 = coords[j]
+            plt.plot([x1, x2], [y1, y2], 'k-', linewidth=1)
 
-    plt.axis('equal')
-    plt.grid(True)
-    plt.title("Custom Grid Layout for MILP Network")
-    plt.show()
+        plt.axis('equal')
+        plt.grid(True)
+        plt.title("Custom Grid Layout for MILP Network")
+        plt.show()
 
 
 

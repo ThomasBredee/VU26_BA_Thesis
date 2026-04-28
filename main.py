@@ -26,7 +26,7 @@ def main():
 
     # Create network
     net = NETWORK_CHOICE() 
-    data , base_demand = extract_network_data(net, verbose=False)
+    data , base_demand = extract_network_data(net, verbose=True)
 
     # # Create time array
     data['T'] = list(range(TIME))
@@ -67,11 +67,14 @@ def main():
 
     data['ME'], data['MP'] = calculate_Big_M(data['B'], data['T'], data['pD'], verbose = False)
 
-    model = build_model_PV(data)
+    # print("Building model constraints........")
+    # model = build_model_PV(data)
 
-    results = solve_model(model, tee=True)
+    # print("Solving model ....................")
+    # results = solve_model(model, tee=True)
 
-    extract_results(model, results, data)
+    # print("Extracting results................")
+    # extract_results(model, results, data)
 
 
 

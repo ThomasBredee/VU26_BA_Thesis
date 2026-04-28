@@ -83,16 +83,16 @@ def build_model_PV(data):
     # Objective
     # -------------------------
     def obj_rule(m):
-        energy_cost = sum(
+        energy_cost = 20*sum(
             m.c[t] * sum(m.P_sub[s, t] for s in m.B_prime) for t in m.T
         )
         investment_cost = sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        degradation_penalty = sum(
+        degradation_penalty = 0.1*sum(
             m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
         )
-        curtailment_penalty = sum(
+        curtailment_penalty =  sum(
             m.c_curt[t] * m.pPV_curt[i, t]
             for i in m.B for t in m.T
         )
@@ -104,12 +104,12 @@ def build_model_PV(data):
     # -------------------------
 
     # # Fixing batteries of the model OR force battery placement somewhere:
-    def fixing_batteries(m, i):
-        if i in [17]: #17 is the furtherst away
-            return m.b[i] == 1
-        else:
-            return m.b[i] == 0
-    model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
+    # def fixing_batteries(m, i):
+    #     if i in [17, 32]: #17 does not work with 200A, 32 is behind the biggest.
+    #         return m.b[i] == 1
+    #     else:
+    #         return m.b[i] == 0
+    # model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
 
     # #OR this battery rule:
     # def battery_budget_rule(m):
