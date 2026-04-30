@@ -13,6 +13,7 @@ from src.input.load_data import load__demand_and_PV_profile_percentages, load_ye
 from src.input.preprocess_data import build_pD, build_PV, generate_base_demand, generate_base_PV, network_limits, calculate_Big_M
 from src.models.basic_model import build_model
 from src.models.model_PV import build_model_PV
+from src.models.model_PV_Slack import build_model_PV_Slack
 from src.utils.solver import solve_model, extract_results
 
 from src.utils.plotting import (
@@ -67,14 +68,14 @@ def main():
 
     data['ME'], data['MP'] = calculate_Big_M(data['B'], data['T'], data['pD'], verbose = False)
 
-    # print("Building model constraints........")
-    # model = build_model_PV(data)
+    print("Building model constraints........")
+    model = build_model_PV_Slack(data)
 
-    # print("Solving model ....................")
-    # results = solve_model(model, tee=True)
+    print("Solving model ....................")
+    results = solve_model(model, tee=True)
 
-    # print("Extracting results................")
-    # extract_results(model, results, data)
+    print("Extracting results................")
+    extract_results(model, results, data)
 
 
 
