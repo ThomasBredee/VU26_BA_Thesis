@@ -7,24 +7,27 @@ def generate_base_demand(B, low=2500, high=3000, seed=None):
 
 import numpy as np
 
-def generate_base_PV(B, PV_capacity, n_pv=8, seed=42):
+def generate_base_PV(B, base_demand, pv_share, n_pv=8, seed=42):
 
     rng = np.random.default_rng(seed)
     B = list(B)
 
-    pv_buses = set(
-        rng.choice(B, size=min(n_pv, len(B)), replace=False)
-    )
+    total_demand = sum(base_demand[b] for b in B)
+    total_PV_target = pv_share * total_demand
 
-    low = PV_capacity * 0.9
-    high = PV_capacity * 1.1
+    pv_buses = set(rng.choice(B, size=min(n_pv, len(B)), replace=False))
 
-    pv_dict = {
-        int(bus): float(rng.uniform(low, high)) if bus in pv_buses else 0.0
-        for bus in B
-    }
+    base_PV = {}
 
-    return pv_dict
+    total_demand_pv_buses = sum(base_demand[b] for b in pv_buses)
+    for b in B:
+        if b in pv_buses and total_demand_pv_buses > 0:
+            share = base_demand[b] / total_demand_pv_buses
+            base_PV[b] = share * total_PV_target
+        else:
+            base_PV[b] = 0.0  # IMPORTANT: explicitly zero
+
+    return base_PV
 
 def normalize_profile(profile):
     values = profile.values.flatten()

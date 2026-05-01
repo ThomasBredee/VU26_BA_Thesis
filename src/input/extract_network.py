@@ -28,8 +28,7 @@ def extract_network_data(net, verbose=False):
     # Bus set (excluding slack)
     # ---------------------------
     B = [int(b) for b in net.bus.index if int(b) != slack_bus]
-
-    print(net)
+    
     # ---------------------------
     # Lines (edges)
     # ---------------------------

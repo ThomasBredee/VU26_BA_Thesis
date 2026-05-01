@@ -5,7 +5,7 @@ from config import (
     CE, CP, SOC_MIN, SOC_MAX, GAMMA,
     HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
     ELECTRICITY_PRICE_CAP_AT_0,
-    PV_GENERATION
+    PV_SHARE
 )
 
 from src.input.extract_network import extract_network_data
@@ -27,14 +27,13 @@ def main():
 
     # Create network
     net = NETWORK_CHOICE() 
-    data , base_demand = extract_network_data(net, verbose=True)
+    data , base_demand = extract_network_data(net, verbose=False)
 
     # # Create time array
     data['T'] = list(range(TIME))
 
-    # # Demand: load generate base demands, extract percentages, concat into noisy profiles
-    # base_demand = generate_base_demand(data['B'], HOUSE_MIN_USAGE, HOUSE_MAX_USAGE, seed=42)
-    base_PV = generate_base_PV(data['B'], PV_GENERATION, seed=42)
+    # Demand: load generate base demands, extract percentages, concat into noisy profiles
+    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, seed=42)
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
     data['pD'] = build_pD(
