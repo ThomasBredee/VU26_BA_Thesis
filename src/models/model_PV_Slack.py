@@ -1,6 +1,7 @@
 from pyomo.environ import *
 from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
 
+from config import WEIGHT_ENERGY_COST, WEIGHT_INVESTMENT_COST, WEIGHT_CURTAILMENT_COST, WEIGHT_DEGRADATION_PENALTY, WEIGHT_SLACK_PENALTY
 
 def build_model_PV_Slack(data):
     
@@ -60,8 +61,6 @@ def build_model_PV_Slack(data):
 
     model.PV = Param(model.B, model.T, initialize=data['PV'], default=0)
     model.c_curt = Param(model.T, initialize=data['c_curt'])  # €/kWh penalty
-
-    model.c_slack = Param(initialize=10000)
     
 
     # -------------------------
@@ -88,21 +87,21 @@ def build_model_PV_Slack(data):
     # Objective
     # -------------------------
     def obj_rule(m):
-        energy_cost = 20*sum(
+        energy_cost = WEIGHT_ENERGY_COST * sum(
             m.c[t] * sum(m.P_sub[s, t] for s in m.B_prime) for t in m.T
         )
-        investment_cost = sum(
+        investment_cost = WEIGHT_INVESTMENT_COST * sum(
             m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
         )
-        degradation_penalty = 0.1*sum(
+        degradation_penalty = WEIGHT_DEGRADATION_PENALTY * sum(
             m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
         )
-        curtailment_cost =  sum(
+        curtailment_cost =  WEIGHT_CURTAILMENT_COST * sum(
             m.c_curt[t] * m.pPV_curt[i, t]
             for i in m.B for t in m.T
         )
-        slack_penalty = sum(
-            m.c_slack * m.pSlack[i, t]
+        slack_penalty = WEIGHT_SLACK_PENALTY * sum(
+            m.pSlack[i, t]
             for i in m.B for t in m.T
         )
         return energy_cost + investment_cost + curtailment_cost + degradation_penalty + slack_penalty
@@ -114,7 +113,7 @@ def build_model_PV_Slack(data):
 
     # # Fixing batteries of the model OR force battery placement somewhere:
     def fixing_batteries(m, i):
-        if i in []: #17 does not work with 200A, 32 is behind the biggest.
+        if i in [4, 23, 27, 28, 30, 32, 9]: #17 does not work with 200A, 32 is behind the biggest.
             return m.b[i] == 1
         else:
             return m.b[i] == 0

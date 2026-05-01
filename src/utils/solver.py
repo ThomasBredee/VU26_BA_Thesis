@@ -330,6 +330,54 @@ def extract_results(model, results, data, max_print=10):
         plt.show()
 
 
+    """
+    Extract peak absolute line flows and compare with Pmax.
+    """
+
+    L = data['L']
+    T = data['T']
+    Pmax_line = data['Pmax_line']
+
+    line_peak_results = {}
+
+    print("\n=== LINE FLOW PEAKS ===\n")
+
+    for (i, j) in L:
+        flows = []
+
+        for t in T:
+            val = value(model.P[(i, j), t])
+            
+            if val is None:
+                val = 0.0
+
+            flows.append(abs(val))  # absolute flow
+
+        peak_flow = max(flows)
+        Pmax = Pmax_line.get((i, j), None)
+
+        # Avoid division errors
+        if Pmax is not None and Pmax > 0:
+            loading = peak_flow / Pmax
+        else:
+            loading = None
+
+        line_peak_results[(i, j)] = {
+            "peak_flow": peak_flow,
+            "Pmax": Pmax,
+            "loading": loading
+        }
+
+        if loading is not None:
+            print(f"Line ({i},{j}): "
+                  f"Peak = {peak_flow:.2f} kW | "
+                  f"Pmax = {Pmax:.2f} kW | "
+                  f"Loading = {loading:.2%}")
+        else:
+            print(f"Line ({i},{j}): Peak = {peak_flow:.2f} kW | Pmax = None")
+
+    return line_peak_results
+
 
 
 

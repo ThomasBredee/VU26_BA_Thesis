@@ -96,7 +96,7 @@ def convert_series_to_dict(series, T):
     values = series.values.flatten()
     return {t: values[t] for t in T}
 
-def load_year_prices(filepath, year, priced_capped, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
+def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
     """
     Load hourly electricity prices from CSV and return only data for a specified year.
 
@@ -139,9 +139,6 @@ def load_year_prices(filepath, year, priced_capped, datetime_col='Datetime (Loca
     # Convert the electricity prices from MWh to kWh 
     df['Price'] = df['Price'] / 1000
     
-    if priced_capped:
-        df['Price'] = df['Price'].clip(lower=0)
-
     if verbose:
         plot_first_hours_prices(df)
         plot_price_boxplot(df)

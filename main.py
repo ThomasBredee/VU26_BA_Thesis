@@ -3,8 +3,7 @@ from config import (
     TIME,
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
     CE, CP, SOC_MIN, SOC_MAX, GAMMA,
-    HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
-    ELECTRICITY_PRICE_CAP_AT_0,
+    # HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
     PV_SHARE
 )
 
@@ -54,7 +53,7 @@ def main():
         verbose=False
     )
 
-    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, priced_capped=ELECTRICITY_PRICE_CAP_AT_0, verbose=False)
+    price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
 
     data['cP'] = CP

@@ -1,0 +1,103 @@
+1. System-Level Economic Performance
+Objective value
+Objective breakdown:
+Energy cost
+Investment cost
+Degradation cost
+Curtailment cost
+
+Possible extensions:
+Net present value (NPV)
+Cost per kWh served
+Cost savings vs baseline (no storage / no PV)
+
+
+2. Substation Operation
+Substation power over time (P_sub)
+Total substation usage
+
+Possible extensions:
+Peak import/export
+Load factor
+Energy imported vs exported
+
+
+3. Storage (Battery) Performance
+Battery placement (binary decision)
+Installed sizes (Pmax, Emax)
+State of Charge (SOC) over time
+Charging/discharging behavior (implicit)
+
+Possible extensions:
+Cycle count / depth of discharge
+Battery utilization rate
+Charging vs discharging patterns
+Degradation metrics (more detailed)
+
+
+4. PV System Performance
+PV used vs curtailed
+Total PV generation
+PV curtailment over time
+
+Possible extensions:
+Self-consumption ratio
+PV penetration level
+Curtailment percentage
+PV hosting capacity
+
+
+5. Network Operation
+Line flows over time
+Flow direction (positive/negative)
+Selected line visualizations
+
+Possible extensions:
+Power flow distribution across network
+Nodal injections/imbalances
+Network losses (if added later)
+
+
+6. Congestion / Line Utilization
+Peak line flows
+Capacity comparison (Pmax)
+Line loading ratios
+Overload detection (>90%)
+Highlighted congestion periods
+
+Possible extensions:
+Congestion frequency (hours/year)
+Binding constraints analysis
+Bottleneck identification
+Shadow prices / dual values (advanced)
+
+
+7. Temporal Analysis
+Time series plots (SOC, PV, flows, prices)
+Correlation: PV curtailment vs price
+
+Possible extensions:
+Seasonal patterns
+Peak vs off-peak behavior
+Time-of-use clustering
+
+
+8. Price Interaction Analysis
+Electricity price vs:
+Curtailment
+Substation usage
+
+Possible extensions:
+Price arbitrage value of storage
+Sensitivity to price volatility
+Revenue streams (if market participation)
+
+
+9. System Reliability / Feasibility
+Slack variable usage (pSlack implicitly)
+Feasibility via solver status
+
+Possible extensions:
+Unserved energy (ENS)
+Reliability metrics (LOLP, LOLE)
+Constraint violation analysis
