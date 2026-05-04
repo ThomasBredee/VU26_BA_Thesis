@@ -1,11 +1,49 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-def generate_base_demand(B, low=2500, high=3000, seed=None):
-    rng = np.random.default_rng(seed)
-    return {i: rng.uniform(low, high) for i in B}
-
 import numpy as np
+import pandapower as pp
+
+def test_network(net):
+    pp.runpp(net)
+
+    # ---------------------------
+    # Bus voltage statistics
+    # ---------------------------
+    vm_pu = net.res_bus.vm_pu
+    min_v = vm_pu.min()
+    max_v = vm_pu.max()
+
+    min_bus = vm_pu.idxmin()
+    max_bus = vm_pu.idxmax()
+
+    print("\n[Voltage Profile]")
+    print(f"Min voltage        : {min_v:.4f} p.u. (Bus {min_bus})")
+    print(f"Max voltage        : {max_v:.4f} p.u. (Bus {max_bus})")
+
+    # ---------------------------
+    # Substation power flow
+    # ---------------------------
+    ext = net.res_ext_grid.iloc[0]
+
+    p_mw = ext.p_mw
+    q_mvar = ext.q_mvar
+
+    print("\n[Substation Flow]")
+    print(f"P import           : {p_mw:.4f} MW")
+    print(f"Q import           : {q_mvar:.4f} MVAr")
+
+    # ---------------------------
+    # Line loading
+    # ---------------------------
+    loading = net.res_line.loading_percent
+
+    max_loading = loading.max()
+    max_line = loading.idxmax()
+
+    print("\n[Line Loading]")
+    print(f"Max loading        : {max_loading:.2f} % (Line {max_line})")
+
+
 
 def generate_base_PV(B, base_demand, pv_share, n_pv=8, seed=42):
 
@@ -47,22 +85,25 @@ def normalize_profile(profile):
 
 #     return noisy
 
+def add_ARIMA_noise(profile, noise_level=0.08, rho=0.9, seed=42):
+    import numpy as np
 
-def add_ARIMA_noise(profile, noise_level = 0.08, rho = 0.9, seed=42):
-    
-    #rho is correlation between hours.
-    
-    np.random.seed(seed)
-    
-    noise = np.zeros(len(profile))
-    eps = np.random.normal(0, noise_level, len(profile))
+    # Local random generator (no global side effects)
+    rng = np.random.default_rng(seed)
 
-    for t in range(1, len(noise)):
-        noise[t] = rho * noise[t-1] + eps[t]
+    n = len(profile)
+
+    noise = np.zeros(n)
+    eps = rng.normal(0, noise_level, n)
+
+    for t in range(1, n):
+        noise[t] = rho * noise[t - 1] + eps[t]
 
     profile_noisy = profile.copy()
-    profile_noisy.iloc[:, 0] = profile.iloc[:, 0] * (1 + noise)
-    profile_noisy.iloc[:, 0] = profile_noisy.iloc[:, 0].clip(lower=0)
+
+    values = profile.iloc[:, 0].to_numpy()
+    noisy_values = values * (1 + noise)
+    profile_noisy.iloc[:, 0] = np.clip(noisy_values, 0, None)
 
     return profile_noisy
 
@@ -83,21 +124,24 @@ def build_pD(B, T, base_demand, profile, verbose=False):
 
     return pD
 
-def calculate_Big_M(B, T, pD, verbose=False):
-    ME = {}
-    MP = {}
+def build_pQ(qp_ratio, pD):
+    """
+    Construct reactive demand time series from active demand.
 
-    for i in B:
-        total_demand = sum(pD.get((i, t), 0) for t in T)
-        ME[i] = 0.05 * total_demand
-        MP[i] = 0.25 * ME[i] # making sure its an 4 hour battery
-    if verbose:
-        print("\n === Big-M Calculation === \n")
-        print("ME is: ", ME[1])
-        print("MP is: ", MP[1])
+    Parameters:
+        qp_ratio (dict): {bus: q/p ratio}
+        pD (dict): {(bus, t): active demand}
 
-    return ME, MP
+    Returns:
+        dict: {(bus, t): reactive demand}
+    """
+    qD = {}
 
+    for (i, t), p_it in pD.items():
+        ratio = qp_ratio.get(i, 0.0)
+        qD[(i, t)] = p_it * ratio
+
+    return qD
 
 def network_limits(B, L, T, pD, line_factor=5.0, substation_factor=1, verbose=False):
 
@@ -143,7 +187,7 @@ def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
 
     T_window = T[start:start + horizon]
 
-    for bus in B[:n_buses]:
+    for bus in B[2:2+n_buses]:
         values = [pD[(bus, t)] for t in T_window]
         plt.plot(T_window, values, label=f'Bus {bus}')
 

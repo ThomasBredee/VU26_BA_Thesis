@@ -1,6 +1,7 @@
-import numpy as np
+import networkx as nx
+import pandas as pd
 import pandapower.plotting as plot
-import pandapower.networks as pn
+import numpy as np
 
 
 def extract_network_data(net, verbose=False):
@@ -32,61 +33,50 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     # Lines (edges)
     # ---------------------------
-    # Define lines to remove --> these are the tie_lines
-    remove_pairs = {
-        (7, 20),
-        (8, 14),
-        (11, 21),
-        (17, 32),
-        (24, 28)
-    }
-
-    # Build raw lines
-    raw_lines = [
+    L = [
         (int(row.from_bus), int(row.to_bus))
         for _, row in net.line.iterrows()
+        if row.from_bus != slack_bus and row.to_bus != slack_bus
     ]
-
-    # Filter L: remove slack connections + specified lines (both directions)
-    L = [
-        (i, j)
-        for (i, j) in raw_lines
-        if i != slack_bus
-        and j != slack_bus
-        and (i, j) not in remove_pairs
-        and (j, i) not in remove_pairs
-    ]
+    
+    # ---------------------------
+    # Check if edges create a Radial graph
+    # ---------------------------
+    
+    mg = nx.Graph()
+    for _, row in net.line.iterrows():
+        if row.in_service:
+            mg.add_edge(int(row.from_bus), int(row.to_bus))
+    assert nx.is_tree(mg), "Network is not radial"
+    
 
     # ---------------------------
     # Line capacities (kW)
     # ---------------------------
-    net.line["max_i_ka"] = 0.5
 
     Pmax_line = {}
 
-    for (i, j) in L:
+    for _, row in net.line.iterrows():
+        i = int(row.from_bus)
+        j = int(row.to_bus)
+
         if i == slack_bus or j == slack_bus:
             continue
 
-        # find matching line
-        line = net.line[(net.line.from_bus == i) & (net.line.to_bus == j)]
+        I_max = row.max_i_ka
+        V_kv = net.bus.vn_kv.at[i]
 
-        if line.empty:
-            continue
+        S_max_MVA = np.sqrt(3) * V_kv * I_max
+        Pmax_line[(i, j)] = S_max_MVA * 1000  # kW
 
-        row = line.iloc[0]
-
-        if row.max_i_ka is not None:
-            I_max = row.max_i_ka  # kA
-            V_kv = net.bus.vn_kv.at[i]
-
-            S_max_MVA = (3 ** 0.5) * V_kv * I_max #standard approxiamation --> check the constant
-            Pmax_line[(i, j)] = S_max_MVA * 1000  # kW
 
     # ---------------------------
     # Substation capacity (kW)
     # ---------------------------
-    Pmax_sub = net.ext_grid.max_p_mw.iloc[0] * 1000  # MW → kW
+    trafo = net.trafo.iloc[0]
+    S_max_MVA = trafo.sn_mva
+    Pmax_sub = S_max_MVA * 1000  # MW → kW
+
 
     # ---------------------------
     # Load per bus + yearly energy
@@ -99,158 +89,193 @@ def extract_network_data(net, verbose=False):
         * 1000
     )
 
-    E_year_kWh = P_base_kw * 8760
+    load_factor = 0.4
+    E_year_kWh = P_base_kw * load_factor * 8760
     E_year_kWh_dict = E_year_kWh.to_dict()
 
 
-    # print(net.line["max_i_ka"].describe())
-    # print(net.line["max_i_ka"].head(10))
+    # ---------------------------
+    # Reactive power (snapshot)
+    # ---------------------------
+    Q_base_kvar = (
+        net.load[net.load.bus.isin(B)]
+        .groupby("bus")["q_mvar"]
+        .sum()
+        .reindex(B, fill_value=0)
+        * 1000  # MVar → kVar
+    )
+    Q_base_kvar_dict = Q_base_kvar.to_dict()
+
+
+    # ---------------------------
+    # Power factor ratio (q/p)
+    # ---------------------------
+    qp_ratio = {}
+
+    for b in B:
+        p = P_base_kw.get(b, 0)
+        q = Q_base_kvar.get(b, 0)
+
+        if p > 0:
+            qp_ratio[b] = q / p
+        else:
+            qp_ratio[b] = 0.0
+
+
+    # ---------------------------
+    # Per-unit base values
+    # ---------------------------
+    S_base_MVA = 1.0  # standard choice
+    V_base_kV = net.bus.vn_kv.iloc[0]
+    Z_base_ohm = (V_base_kV ** 2) / S_base_MVA  # Ω
+
+
+    # ---------------------------
+    # Line impedances (per-unit)
+    # ---------------------------
+    r_pu = {}
+    x_pu = {}
+
+    for _, row in net.line.iterrows():
+        i = int(row.from_bus)
+        j = int(row.to_bus)
+
+        if i == slack_bus or j == slack_bus:
+            continue
+
+        # Physical impedance (IMPORTANT: include length!)
+        r_ohm = row.r_ohm_per_km * row.length_km
+        x_ohm = row.x_ohm_per_km * row.length_km
+
+        # Convert to per-unit
+        r_pu[(i, j)] = r_ohm / Z_base_ohm
+        x_pu[(i, j)] = x_ohm / Z_base_ohm
+
+
+
 
 
     # ---------------------------
     # Verbose output
     # ---------------------------
     if verbose:
-        print("\n================ NETWORK SUMMARY ================\n")
+        print("\n" + "="*60)
+        print("NETWORK SUMMARY")
+        print("="*60)
 
-        print("GENERAL INFO")
-        print(f"Slack bus              : {slack_bus}")
-        print(f"Total buses           : {len(net.bus)}")
-        print(f"Distribution buses    : {len(B)}")
-        print(f"Total lines           : {len(net.line)}")
-        print()
+        # ---------------------------
+        # General
+        # ---------------------------
+        print("\n[General]")
+        print(f"Slack bus           : {slack_bus}")
+        print(f"Total buses         : {len(net.bus)}")
+        print(f"Distribution buses  : {len(B)}")
+        print(f"Total lines         : {len(net.line)}")
 
-        print("BUS SETS")
-        print(f"B          : {B}")
-        print(f"B'         : {B_prime}")
-        print()
+        # ---------------------------
+        # Substation
+        # ---------------------------
+        print("\n[Substation]")
+        print(f"Transformer capacity: {Pmax_sub:.1f} kW")
 
-        print("SUBSTATION")
-        print(f"Estimated capacity    : {Pmax_sub:.2f} kW")
-        print()
+        # ---------------------------
+        # Per-unit base
+        # ---------------------------
+        print("\n[Per-Unit Base]")
+        print(f"S_base              : {S_base_MVA:.2f} MVA")
+        print(f"V_base              : {V_base_kV:.3f} kV")
+        print(f"Z_base              : {Z_base_ohm:.4f} ohm")
 
-        print("LINES (i → j)")
-        for (i, j) in L:
-            pmax = Pmax_line.get((i, j), None)
-            print(f"  {i} → {j}")
-            print(f"      Pmax_line: {pmax}")
-        print()
+        # ---------------------------
+        # Line capacities (compact table)
+        # ---------------------------
+        print("\n[Lines]")
+        if Pmax_line:
+            df_lines = pd.DataFrame([
+                {
+                    "from": i,
+                    "to": j,
+                    "Pmax_kW": round(Pmax_line[(i, j)], 1),
+                    "r_pu": round(r_pu[(i, j)], 4),
+                    "x_pu": round(x_pu[(i, j)], 4)
+                }
+                for (i, j) in L if (i, j) in Pmax_line
+            ])
+            print(df_lines.head(10).to_string(index=False))
 
-        print("BUS ENERGY (yearly)")
+            if len(df_lines) > 10:
+                print(f"... ({len(df_lines)} lines total)")
+        else:
+            print("No active lines found.")
+
+        # ---------------------------
+        # Impedance sanity check
+        # ---------------------------
+        print("\n[Impedance Check]")
+        r_vals = np.array(list(r_pu.values()))
+        x_vals = np.array(list(x_pu.values()))
+
+        print(f"r_pu range          : {r_vals.min():.4f} – {r_vals.max():.4f}")
+        print(f"x_pu range          : {x_vals.min():.4f} – {x_vals.max():.4f}")
+
+        rx_ratio = r_vals / np.maximum(x_vals, 1e-6)
+        print(f"R/X ratio (avg)     : {rx_ratio.mean():.2f}")
+
+        # ---------------------------
+        # Load summary
+        # ---------------------------
+        print("\n[Loads]")
+        total_P = np.sum(P_base_kw)
+        total_Q = np.sum(Q_base_kvar)
+
+        print(f"Total P (snapshot)  : {total_P:.1f} kW")
+        print(f"Total Q (snapshot)  : {total_Q:.1f} kvar")
+
+        total_energy = sum(E_year_kWh_dict.values())
+        print(f"Total annual energy : {total_energy:.1f} kWh")
+
+        # ---------------------------
+        # Power factor check
+        # ---------------------------
+        print("\n[Power Factor]")
+        pf = []
         for b in B:
-            e = E_year_kWh_dict.get(b, 0)
-            print(f"  Bus {b}: {e:.2f} kWh/year")
-        print()
+            p = P_base_kw.get(b, 0)
+            q = Q_base_kvar.get(b, 0)
+            if p > 0:
+                pf.append(p / np.sqrt(p**2 + q**2))
 
-        print("=================================================\n")
+        if pf:
+            print(f"PF range            : {min(pf):.3f} – {max(pf):.3f}")
+            print(f"PF average          : {np.mean(pf):.3f}")
 
-    
+        # ---------------------------
+        # Top loads
+        # ---------------------------
+        print("\n[Top Load Buses]")
+        top_buses = sorted(P_base_kw.items(), key=lambda x: -x[1])[:5]
+        for b, p in top_buses:
+            print(f"  Bus {b:>3}: {p:>8.1f} kW")
 
+        print("\n" + "="*60 + "\n")
 
-
-
-
-        # pLotting the network.......................
-        import pandas as pd
-
-        coords = {}
-
-        # -------------------------
-        # MAIN CHAIN: 1 → 17 (horizontal line)
-        # -------------------------
-        for i in range(1, 18):
-            coords[i] = (i, 0)
-
-        # -------------------------
-        # BRANCH: 1 → 18 → 21 (upper branch)
-        # -------------------------
-        coords[18] = (1, 1)
-        coords[19] = (2, 1)
-        coords[20] = (3, 1)
-        coords[21] = (4, 1)
-
-        # -------------------------
-        # BRANCH: 2 → 22 → 24 (upper-mid branch)
-        # -------------------------
-        coords[22] = (2, -2)
-        coords[23] = (3, -2)
-        coords[24] = (4, -2)
-
-        # -------------------------
-        # LONG BRANCH: 5 → 25 → 32 (lower branch)
-        # -------------------------
-        for idx, bus in enumerate(range(25, 33)):
-            coords[bus] = (5 + idx, -1)
-
-        # -------------------------
-        # FIX CROSS CONNECTION TARGETS (ensure alignment looks good)
-        # -------------------------
-        coords[7]  = (7, 0)
-        coords[8]  = (8, 0)
-        coords[11] = (11, 0)
-        coords[14] = (14, 0)
-        coords[17] = (17, 0)
-
-        coords[28] = (8, -1)
-
-        # -------------------------
-        # SUBSTATION NODE (0)
-        # -------------------------
-        coords[0] = (0, 0)
-
-
-        bus_geodata = pd.DataFrame.from_dict(coords, orient='index', columns=["x", "y"])
-
-        import matplotlib.pyplot as plt
-
-        plt.figure(figsize=(10, 5))
-
-        # draw nodes
-        for bus, (x, y) in coords.items():
-            plt.scatter(x, y, s=120)
-            plt.text(x, y, str(bus),
-                    ha='center', va='center',
-                    fontsize=9,
-                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
-
-        # draw edges
-        edges = [
-            (1,2),(2,3),(3,4),(4,5),(5,6),(6,7),(7,8),(8,9),
-            (9,10),(10,11),(11,12),(12,13),(13,14),(14,15),
-            (15,16),(16,17),
-            (1,18),(18,19),(19,20),(20,21),
-            (2,22),(22,23),(23,24),
-            (5,25),(25,26),(26,27),(27,28),(28,29),(29,30),(30,31),(31,32),
-        ]
-
-        for i, j in edges:
-            x1, y1 = coords[i]
-            x2, y2 = coords[j]
-            plt.plot([x1, x2], [y1, y2], 'k-', linewidth=1)
-
-        plt.axis('equal')
-        plt.grid(True)
-        plt.title("Custom Grid Layout for MILP Network")
-        plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        # ---------------------------
+        # Plot
+        # ---------------------------
+        try:
+            plot.simple_plot(net)
+        except Exception as e:
+            print(f"Plot failed: {e}")
 
     return {
         "B": B,
         "B_prime": B_prime,
         "L": L,
         "Pmax_line": Pmax_line,
-        "Pmax_sub": Pmax_sub
-    }, E_year_kWh_dict
+        "Pmax_sub": Pmax_sub,
+        "S_base_MVA": S_base_MVA,
+        "V_base_kV": V_base_kV,
+        "Z_base_ohm": Z_base_ohm,
+        "r_pu": r_pu,
+        "x_pu": x_pu
+    }, E_year_kWh_dict, Q_base_kvar_dict, qp_ratio

@@ -2,17 +2,19 @@ from config import (
     NETWORK_CHOICE,
     TIME,
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
-    CE, CP, SOC_MIN, SOC_MAX, GAMMA,
-    # HOUSE_MIN_USAGE, HOUSE_MAX_USAGE,
+    CE, CP, SOC_MIN, SOC_MAX,
     PV_SHARE
 )
 
 from src.input.extract_network import extract_network_data
 from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
-from src.input.preprocess_data import build_pD, build_PV, generate_base_demand, generate_base_PV, network_limits, calculate_Big_M
-from src.models.basic_model import build_model
-from src.models.model_PV import build_model_PV
-from src.models.model_PV_Slack import build_model_PV_Slack
+from src.input.preprocess_data import build_pD, build_pQ, test_network, build_PV, generate_base_PV, network_limits
+
+# from models.depracted_old_models.basic_model import build_model
+# from models.depracted_old_models.model_PV import build_model_PV
+# from models.depracted_old_models.model_PV_Slack import build_model_PV_Slack
+from src.models.model_reactive import build_model_reactive
+
 from src.utils.solver import solve_model, extract_results
 
 from src.utils.plotting import (
@@ -25,14 +27,15 @@ def main():
     print('Starting pipeline................. \n')
 
     # Create network
-    net = NETWORK_CHOICE() 
-    data , base_demand = extract_network_data(net, verbose=False)
+    net = NETWORK_CHOICE 
+    test_network(net)
 
-    # # Create time array
+    data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
+
+    # Create time array
     data['T'] = list(range(TIME))
 
     # Demand: load generate base demands, extract percentages, concat into noisy profiles
-    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, seed=42)
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
     data['pD'] = build_pD(
@@ -40,11 +43,15 @@ def main():
         T=data['T'],
         base_demand=base_demand,
         profile=demand_data_percentages,
-        verbose=False
+        verbose=True
     )
 
-    # data['Pmax_line'], data['Pmax_sub'] = network_limits(B=data['B'], L=data['L'], T=data['T'], pD=data['pD'], verbose=False)
+    data['pQ'] = build_pQ(qp_ratio, data['pD'])
 
+    data["MP"] = data["Pmax_sub"]
+    data["ME"] = data["Pmax_sub"] * 12 #making it a 12 hour battery, more free then before.
+
+    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, seed=42)
     data['PV'] = build_PV(
         B=data['B'],
         T=data['T'],
@@ -58,16 +65,13 @@ def main():
 
     data['cP'] = CP
     data['cE'] = CE
-    data['gamma'] = GAMMA
     data['SOC_min'] = SOC_MIN
     data['SOC_max'] = SOC_MAX
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
         #t: 100000 for t in data['T']}
 
-    data['ME'], data['MP'] = calculate_Big_M(data['B'], data['T'], data['pD'], verbose = False)
-
     print("Building model constraints........")
-    model = build_model_PV_Slack(data)
+    model = build_model_reactive(data)
 
     print("Solving model ....................")
     results = solve_model(model, tee=True)
@@ -78,29 +82,29 @@ def main():
 
 
 
-    #Testing:
-    system_balance_check = False
-    if system_balance_check:
-        print("\n=== System balance check ===")
-        T_list = list(model.T)
+    # #Testing:
+    # system_balance_check = False
+    # if system_balance_check:
+    #     print("\n=== System balance check ===")
+    #     T_list = list(model.T)
 
-        for t in T_list[0:50]:
-            total_demand = sum(data['pD'].get((i, t), 0) for i in model.B)
-            total_discharge = sum(model.pDIS[i, t].value for i in model.B)
-            total_charge = sum(model.pCHA[i, t].value for i in model.B)
-            total_sub = sum(model.P_sub[s, t].value for s in model.B_prime)
+    #     for t in T_list[0:50]:
+    #         total_demand = sum(data['pD'].get((i, t), 0) for i in model.B)
+    #         total_discharge = sum(model.pDIS[i, t].value for i in model.B)
+    #         total_charge = sum(model.pCHA[i, t].value for i in model.B)
+    #         total_sub = sum(model.P_sub[s, t].value for s in model.B_prime)
 
-            net_battery = total_discharge - total_charge
+    #         net_battery = total_discharge - total_charge
 
-            print(f"t={t}: demand={total_demand:.2f}, "
-                f"battery_net={net_battery:.2f}, "
-                f"substation={total_sub:.2f}")
+    #         print(f"t={t}: demand={total_demand:.2f}, "
+    #             f"battery_net={net_battery:.2f}, "
+    #             f"substation={total_sub:.2f}")
         
-        # T_list = list(model.T)
+    #     # T_list = list(model.T)
 
-        # for i in model.B:
-        #     soc_values = [model.E[i, t].value for t in T_list[:50]]
-        #     print(f"Bus {i}: {soc_values}")
+    #     # for i in model.B:
+    #     #     soc_values = [model.E[i, t].value for t in T_list[:50]]
+    #     #     print(f"Bus {i}: {soc_values}")
 
 
 
