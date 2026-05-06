@@ -14,8 +14,25 @@ WEIGHT_CURTAILMENT_COST = 1
 WEIGHT_DEGRADATION_PENALTY = 0.1
 WEIGHT_SLACK_PENALTY = 10000
 
-CP = 260
-CE = 280
+BATTERY_EFFICIENCY = 0.95
+
+CP = 360
+CE = 210
+
+def capital_recovery_factor(r=0.05, L=10):
+    return (r * (1 + r) ** L) / ((1 + r) ** L - 1)
+r_discount = 0.05
+l_battery = 10
+ALPHA = capital_recovery_factor(r_discount, l_battery)
+
+
+def degradation_cost_per_kwh(cE, N_cycles):
+    return cE / (2 * N_cycles)
+n_cycles = 5000
+C_DEG = degradation_cost_per_kwh(CE, n_cycles)
+
+
+
 
 SOC_MIN = 0.2
 SOC_MAX = 0.8

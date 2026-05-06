@@ -124,7 +124,7 @@ def build_pD(B, T, base_demand, profile, verbose=False):
 
     return pD
 
-def build_pQ(qp_ratio, pD):
+def build_qD(qp_ratio, pD):
     """
     Construct reactive demand time series from active demand.
 
@@ -167,6 +167,15 @@ def network_limits(B, L, T, pD, line_factor=5.0, substation_factor=1, verbose=Fa
         print(f"Substation capacity: {Pmax_sub_value:.2f} kW")
 
     return Pmax_line, Pmax_sub
+
+def build_S_inv(B, T, PV):
+    S_inv = {}
+
+    for i in B:
+        peak_pv = max(PV[(i, t)] for t in T)
+        S_inv[i] = 1.1 * peak_pv   # 10% headroom
+
+    return S_inv
 
 def build_PV(B, T, base_demand, profile, verbose=False):
     PV = {}

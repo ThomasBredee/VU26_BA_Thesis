@@ -1,7 +1,10 @@
 from pyomo.environ import *
 from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
+import math
 
 from config import WEIGHT_ENERGY_COST, WEIGHT_INVESTMENT_COST, WEIGHT_CURTAILMENT_COST, WEIGHT_DEGRADATION_PENALTY, WEIGHT_SLACK_PENALTY
+
+
 
 def build_model_reactive(data):
 
@@ -28,17 +31,38 @@ def build_model_reactive(data):
     # -------------------------
     # Sets
     # -------------------------
-    model.B = Set(initialize=data['B'])                    # distribution buses, set: [1,2,3,....]
-    model.B_prime = Set(initialize=data['B_prime'])        # substation bus(es), set: [0]
+    model.B = Set(initialize=data['B'])                    # distribution buses, set: [0,1,2,3,....]
+    model.B0 = Set(initialize=data['B_prime'])             # substation bus + all buses , set: [129] + [0,1,2,3,....]
     model.L = Set(dimen=2, initialize=data['L'])
     model.T = Set(initialize=data['T'])                    # time intervals, t=[0, 1, 2, ..., 8759]
+    
+    # def children_init(model, i):
+    #     return data["children_map"].get(i, [])
+    # model.C = Set(model.B0, initialize=children_init)
+
+
+    # -------------------------
+    # LinDistFlow Parameters
+    # -------------------------
+    model.r = Param(model.L, initialize=data['r_pu'])   # resistance (p.u.)
+    model.x = Param(model.L, initialize=data['x_pu'])   # reactance (p.u.) 
+    model.Smax_line = Param(model.L, initialize=data['Pmax_line'])     # Line apparent power limit (kVA or p.u. consistent)
+    model.v_min = Param(initialize=0.9025)   # (0.95)^2     # Voltage limits (squared p.u.)
+    model.v_max = Param(initialize=1.1025)   # (1.05)^2     # Voltage limits (squared p.u.)
+    model.S_trafo = Param(initialize=data['Pmax_sub'])  # Transformer rating  e.g. 160 kVA --> TODO: CHECK THIS, IT GIVES 400 INSTEAD OF 160.
+    model.qD = Param(model.B, model.T, initialize=data['qD'], default=0)   # Reactive demand
+    model.S_inv = Param(model.B, initialize=data['S_inv'])     # PV inverter apparent power rating
+    model.eta = Param(initialize=data['eta'])  # ~0.9747     # Battery efficiency (one-way)
+    model.dt = Param(initialize=1)     # Time step
+    model.alpha = Param(initialize=data['alpha'])     # Annuity factor
+    model.c_deg = Param(initialize=data['c_deg'])     # Degradation cost per kWh throughput
+    model.E_CAP = Param(initialize=4 * data['Pmax_sub']) #Big-M constraint.
+
 
     # -------------------------
     # Parameters
     # -------------------------
     model.pD = Param(model.B, model.T, initialize=data['pD'], default=0)   # demand at buses [1,2,3,...]
-    model.Pmax_line = Param(model.L, initialize=data['Pmax_line'])         # line capacities 
-    model.Pmax_sub = Param(model.B_prime, initialize=data['Pmax_sub'])     # substation max supply per timestep
     model.c = Param(model.T, initialize=data['c'])                          # electricity price at substation for every time t in T.
 
     model.cP = Param(initialize=data['cP'])                                 # battery power cost
@@ -47,54 +71,66 @@ def build_model_reactive(data):
     model.SOC_min = Param(initialize=data['SOC_min'])     # SOC minimum for batteries
     model.SOC_max = Param(initialize=data['SOC_max'])     # SOC maximum for batteries
 
-    model.MP = Param(model.B, initialize=data['MP'])  # Big-M power per bus
-    model.ME = Param(model.B, initialize=data['ME'])  # Big-M energy per bus
+    # model.MP = Param(model.B, initialize=data['MP'])  # Big-M power per bus
+    # model.ME = Param(model.B, initialize=data['ME'])  # Big-M energy per bus
 
     model.PV = Param(model.B, model.T, initialize=data['PV'], default=0)
     model.c_curt = Param(model.T, initialize=data['c_curt'])  # €/kWh penalty
 
+
     # -------------------------
     # Variables
     # -------------------------
-    model.P = Var(model.L, model.T, domain=Reals)                     # line flows of power, positive means i -> j, negative means j -> i
-    model.P_sub = Var(model.B_prime, model.T, domain=NonNegativeReals)  # substation injection of electricity into the first bus.
-    model.p = Var(model.B, model.T, domain=Reals)                     # net injection at bus
+    model.P = Var(model.L, model.T, domain=Reals)               # Active power flow on lines (i -> j, parent-to-child convention)
+    model.P_sub = Var(model.B0[1], model.T, domain=Reals)     # Substation power (now allows export as well → Reals, NOT NonNegative)
 
-    model.b = Var(model.B, domain=Binary)                              # battery installation 1=yes, 0=no
-    model.Pmax = Var(model.B, domain=NonNegativeReals)                 # installed battery power at bus
-    model.Emax = Var(model.B, domain=NonNegativeReals)                 # installed battery energy at bus
-    model.pCHA = Var(model.B, model.T, domain=NonNegativeReals)        # charging power at timestep t, at bus b
-    model.pDIS = Var(model.B, model.T, domain=NonNegativeReals)        # discharging power at timestep t, at bus b
-    model.E = Var(model.B, model.T, domain=NonNegativeReals)           # SOC of battery at timestep t, at bus b
+    model.b = Var(model.B, domain=Binary)                       # install battery or not
+    model.Pmax = Var(model.B, domain=NonNegativeReals)          # battery power rating (kW or p.u.)
+    model.Emax = Var(model.B, domain=NonNegativeReals)          # battery energy capacity (kWh or p.u.)
+
+    model.pCHA = Var(model.B, model.T, domain=NonNegativeReals) # charging power
+    model.pDIS = Var(model.B, model.T, domain=NonNegativeReals) # discharging power
+    model.E = Var(model.B, model.T, domain=NonNegativeReals)    # state of charge (SOC)
 
     model.pPV_used = Var(model.B, model.T, domain=NonNegativeReals)
     model.pPV_curt = Var(model.B, model.T, domain=NonNegativeReals)
 
+    model.Q = Var(model.L, model.T, domain=Reals)               # Reactive power flow on lines (parent -> child)
+    model.v = Var(model.B, model.T, domain=NonNegativeReals)   # Squared voltage magnitude (p.u.^2)
+    model.Q_sub = Var(model.B0[1], model.T, domain=Reals)     # Reactive power at substation (grid exchange)
+    model.qPV = Var(model.B, model.T, domain=Reals)             # PV reactive power injection (can be positive or negative)
+
     # -------------------------
-    # Objective
+    # Objective (LinDistFlow-consistent)
     # -------------------------
     def obj_rule(m):
-        energy_cost = WEIGHT_ENERGY_COST * sum(
-            m.c[t] * sum(m.P_sub[s, t] for s in m.B_prime) for t in m.T
+        energy_cost = sum(
+            m.c[t] * m.P_sub[s, t] * m.dt
+            for s in m.B0
+            for t in m.T
         )
-        investment_cost = WEIGHT_INVESTMENT_COST * sum(
-            m.cP * m.Pmax[i] + m.cE * m.Emax[i] for i in m.B
+        investment_cost = m.alpha * sum(
+            m.cP * m.Pmax[i] + m.cE * m.Emax[i]
+            for i in m.B
         )
-        degradation_penalty = WEIGHT_DEGRADATION_PENALTY * sum(
-            m.pCHA[i, t] + m.pDIS[i, t] for i in m.B for t in m.T
+        degradation_cost = m.c_deg * sum(
+            (m.pCHA[i, t] + m.pDIS[i, t]) * m.dt
+            for i in m.B
+            for t in m.T
         )
-        curtailment_cost =  WEIGHT_CURTAILMENT_COST * sum(
-            m.c_curt[t] * m.pPV_curt[i, t]
-            for i in m.B for t in m.T
+        curtailment_cost = sum(
+            m.c_curt[t] * m.pPV_curt[i, t] * m.dt
+            for i in m.B
+            for t in m.T
         )
-        return energy_cost + investment_cost + curtailment_cost + degradation_penalty
+        return energy_cost + investment_cost + degradation_cost + curtailment_cost
     model.OBJ = Objective(rule=obj_rule, sense=minimize)
 
     # -------------------------
     # Constraints
     # -------------------------
 
-    # THESE ARE JUST KEPT HERE FOR QUICK DEBUGGING RUNS
+    # NOTE: THESE 2 CONSTRAINTS ARE JUST KEPT HERE FOR QUICK DEBUGGING RUNS..................
     # # Fixing batteries of the model OR force battery placement somewhere:
     # def fixing_batteries(m, i):
     #     if i in [17, 32]: #17 does not work with 200A, 32 is behind the biggest.
@@ -110,48 +146,133 @@ def build_model_reactive(data):
     
 
 
+    # # Active power balance rule for all buses.
+    def active_balance_rule(m, j, t):
+        parent = data['parent_map'].get(j, None)
+        children = data['children_map'].get(j, [])
+
+        inflow = 0
+        if parent is not None:
+            inflow += m.P[parent, j, t]
+
+        return inflow - sum(m.P[j, k, t] for k in children) == (
+            m.pD[j, t] - m.pPV_used[j, t] + m.pCHA[j, t] - m.pDIS[j, t]
+        )
+    model.ActiveBalance = Constraint(model.B, model.T, rule=active_balance_rule)
+
+    # # Reactive power balance rule for all buses.
+    def reactive_balance_rule(m, j, t):
+        parent = data['parent_map'].get(j, None)
+        children = data['children_map'].get(j, [])
+
+        inflow = 0
+        if parent is not None:
+            inflow += m.Q[parent, j, t]
+
+        return inflow - sum(m.Q[j, k, t] for k in children) == (
+            m.qD[j, t] - m.qPV[j, t]
+        )
+    model.ReactiveBalance = Constraint(model.B, model.T, rule=reactive_balance_rule)
+
+        # # Substation active balance
+    def substation_balance_P(m, t):
+        s = list(m.B0)[0]
+        return m.P_sub[s, t] == sum(m.P[i, j, t] for (i, j) in m.L if i == s)
+    model.SubstationP = Constraint(model.T, rule=substation_balance_P)
+
+    # Substation reactive balance
+    def substation_balance_Q(m, t):
+        s = list(m.B0)[0]
+        return m.Q_sub[s, t] == sum(m.Q[i, j, t] for (i, j) in m.L if i == s)
+    model.SubstationQ = Constraint(model.T, rule=substation_balance_Q)
+
+
+
+
+
+
+    # Voltage drop (LinDistFlow)
+    def voltage_drop_rule(m, i, j, t):
+        return m.v[j, t] == m.v[i, t] - 2 * (
+            m.r[i, j] * m.P[i, j, t] +
+            m.x[i, j] * m.Q[i, j, t]
+        )
+    model.VoltageDrop = Constraint(model.L, model.T, rule=voltage_drop_rule)
+
+    # Substation Slack (fix substation at 1 p.u.)
+    def slack_voltage_rule(m, t):
+        s = list(m.B0)[0]
+        return m.v[s, t] == 1.0   # 1 p.u. squared
+    model.SlackVoltage = Constraint(model.T, rule=slack_voltage_rule)
+
+
+    # Voltage limits
+    def voltage_limits_rule(m, i, t):
+        return (m.v_min, m.v[i, t], m.v_max)
+    model.VoltageLimits = Constraint(model.B, model.T, rule=voltage_limits_rule)
+
+
+    # Precompute angles.
+    K = 8
+    theta_list = [2 * math.pi * k / K for k in range(K)]
+    model.K = RangeSet(0, K - 1)
+    model.theta = Param(model.K, initialize={k: theta_list[k] for k in range(K)})
+
+
+    # Line apparent power limits (polygon)
+    def line_limit_rule(m, i, j, t, k):
+        theta = m.theta[k]
+        return (
+            m.P[i, j, t] * math.cos(theta) +
+            m.Q[i, j, t] * math.sin(theta)
+            <= m.Smax_line[i, j]
+        )
+    model.LineLimits = Constraint(model.L, model.T, model.K, rule=line_limit_rule)
+
+    # Substation apparent power limit
+    def substation_limit_rule(m, t, k):
+        theta = m.theta[k]
+        return (
+            m.P_sub[t] * math.cos(theta) +
+            m.Q_sub[t] * math.sin(theta)
+            <= m.S_trafo
+        )
+    model.SubstationLimits = Constraint(model.T, model.K, rule=substation_limit_rule)
+
+
     #PV linking:
     def pv_split_rule(m, i, t):
         return m.pPV_used[i, t] + m.pPV_curt[i, t] == m.PV[i, t]
     model.PVSplit = Constraint(model.B, model.T, rule=pv_split_rule)
     
+    # PV inverter apparent power constraint (polygon)
+    def pv_inverter_limit_rule(m, i, t, k):
+        theta = m.theta[k]
+        return (
+            m.pPV_used[i, t] * math.cos(theta) +
+            m.qPV[i, t] * math.sin(theta)
+            <= m.S_inv[i]
+        )
+    model.PVInverterLimits = Constraint(model.B, model.T, model.K, rule=pv_inverter_limit_rule)
 
 
-     # Net injection at each bus
-    def net_injection_rule(m, i, t):
-        if i == 1:
-            #Bus 1 gets the powerinjection from the substation extra!!
-            return m.p[i,t] == m.pDIS[i, t] - m.pCHA[i, t] - m.pD[i, t] + m.P_sub[0,t] + m.pPV_used[i, t]
-        return m.p[i, t] == m.pDIS[i, t] - m.pCHA[i, t] - m.pD[i, t] + m.pPV_used[i, t]
-    model.NetInjection = Constraint(model.B, model.T, rule=net_injection_rule)
-    
-    def power_balance_rule(m, i, t):
-        inflow = sum(m.P[j, i, t] for (j, i2) in m.L if i2 == i)
-        outflow = sum(m.P[i, j, t] for (i2, j) in m.L if i2 == i)
-
-        return m.p[i, t] == inflow - outflow
-    model.PowerBalance = Constraint(model.B, model.T, rule=power_balance_rule)
-
-    # Line capacity limits
-    def line_limit_rule(m, i, j, t):
-        return (-m.Pmax_line[i, j], m.P[i, j, t], m.Pmax_line[i, j])
-    model.LineLimits = Constraint(model.L, model.T, rule=line_limit_rule)
-
-    # Substation limits
-    def substation_limit_rule(m, s, t):
-        return (0, m.P_sub[s, t], m.Pmax_sub[s])
-    model.SubstationLimit = Constraint(model.B_prime, model.T, rule=substation_limit_rule)
-
-    # SOC dynamics
+    # SOC dynamics (correct efficiency form)
     def soc_rule(m, i, t):
         t_first = m.T.first()
+        
         if t == t_first:
-            return m.E[i, t] == 0.5 * m.Emax[i]
+            return Constraint.Skip   # no fixed initial SOC
         else:
             t_prev = m.T.prev(t)
-            return m.E[i, t] == m.E[i, t_prev] + m.pCHA[i, t] - m.pDIS[i, t]
+            return m.E[i, t] == (
+                m.E[i, t_prev]
+                + m.eta * m.pCHA[i, t] * m.dt
+                - (1 / m.eta) * m.pDIS[i, t] * m.dt
+            )
     model.SOC = Constraint(model.B, model.T, rule=soc_rule)
 
+
+    # Cyclic SOC constraint
     def soc_cycle_rule(m, i):
         t_first = m.T.first()
         t_last = m.T.last()
@@ -168,6 +289,8 @@ def build_model_reactive(data):
         return m.E[i, t] <= m.SOC_max * m.Emax[i]
     model.SOCUpperLimits = Constraint(model.B, model.T, rule=soc_upper_limit_rule)
 
+
+
     # Upper bound: discharging <= Pmax
     def discharge_upper_rule(m, i, t):
         return m.pDIS[i, t] <= m.Pmax[i]
@@ -177,22 +300,17 @@ def build_model_reactive(data):
         return m.pCHA[i, t] <= m.Pmax[i]
     model.ChargeUpper = Constraint(model.B, model.T, rule=charge_upper_rule)
 
+
+    def power_energy_coupling_rule(m, i):
+        return m.Pmax[i] == m.Emax[i] / 4
+    model.PowerEnergyCoupling = Constraint(model.B, rule=power_energy_coupling_rule)
+
  
-    # Big-M constraints
-    def bigM_power_rule(m, i):
-        return m.Pmax[i] <= m.MP[i] * m.b[i]
-    model.BigM_Power = Constraint(model.B, rule=bigM_power_rule)
 
     def bigM_energy_rule(m, i):
-        return m.Emax[i] <= m.ME[i] * m.b[i]
+        return m.Emax[i] <= m.E_CAP * m.b[i]
     model.BigM_Energy = Constraint(model.B, rule=bigM_energy_rule)
-
-
-
-
-    # Power-energy coupling: Pmax <= 0.25 * Emax
-    def power_energy_coupling_rule(m, i):
-        return m.Pmax[i] <= 0.25 * m.Emax[i]
-    model.PowerEnergyCoupling = Constraint(model.B, rule=power_energy_coupling_rule)
+    
+        
 
     return model

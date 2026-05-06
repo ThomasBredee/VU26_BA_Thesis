@@ -2,9 +2,62 @@ import networkx as nx
 import pandas as pd
 import pandapower.plotting as plot
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
+from collections import deque
 
 
 def extract_network_data(net, verbose=False):
+    # buses of interest
+    bus_a = 18
+    bus_b = 8
+
+    print("\n=== Searching in net.line ===")
+
+    matches = net.line[
+        ((net.line.from_bus == bus_a) & (net.line.to_bus == bus_b)) |
+        ((net.line.from_bus == bus_b) & (net.line.to_bus == bus_a))
+    ]
+
+    if not matches.empty:
+        print(matches[[
+            "from_bus", "to_bus",
+            "length_km",
+            "r_ohm_per_km", "x_ohm_per_km"
+        ]])
+    else:
+        print("❌ No line found between buses 18 and 8 in net.line")
+
+
+    # -------------------------
+    # Also check switches (VERY important in SimBench)
+    # -------------------------
+    print("\n=== Searching in net.switch ===")
+
+    switch_matches = net.switch[
+        ((net.switch.bus == bus_a) & (net.switch.element == bus_b)) |
+        ((net.switch.bus == bus_b) & (net.switch.element == bus_a))
+    ]
+
+    if not switch_matches.empty:
+        print(switch_matches)
+    else:
+        print("❌ No switch found between buses 18 and 8")    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     """
     Extract structural network data from a pandapower network.
 
@@ -25,19 +78,141 @@ def extract_network_data(net, verbose=False):
     slack_bus = int(net.ext_grid.bus.iloc[0])
     B_prime = [slack_bus]
 
+
+    # Check transformer connections
+    print(net.trafo[['hv_bus', 'lv_bus', 'sn_mva']])
+    for _, row in net.trafo.iterrows():
+        print(row)
+
     # ---------------------------
     # Bus set (excluding slack)
     # ---------------------------
     B = [int(b) for b in net.bus.index if int(b) != slack_bus]
     
     # ---------------------------
-    # Lines (edges)
+    # Lines (edges), and Parent,Children maps.
     # ---------------------------
     L = [
         (int(row.from_bus), int(row.to_bus))
         for _, row in net.line.iterrows()
-        if row.from_bus != slack_bus and row.to_bus != slack_bus
     ]
+
+    #### THIS CODE DOES NOT WORK?! ####
+    # for line in L:
+    #     print(line)
+
+    # parent_map = {j: i for (i,j) in L}
+    # children_map = {}
+
+    # for (i, j) in L:
+    #     if i not in children_map:
+    #         children_map[i] = []
+    #     children_map[i].append(j)
+
+
+    # Build undirected adjacency first
+    adj = {}
+    for (i, j) in L:
+        adj.setdefault(i, []).append(j)
+        adj.setdefault(j, []).append(i)
+    # BFS from slack bus
+    parent_map = {}
+    children_map = {}
+    visited = set()
+    queue = deque([14]) #SET 14 here as starting point (slack_bus does not work...)
+
+    visited.add(14)
+
+    while queue:
+        parent = queue.popleft()
+
+        for neighbor in adj.get(parent, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                parent_map[neighbor] = parent
+
+                if parent not in children_map:
+                    children_map[parent] = []
+                children_map[parent].append(neighbor)
+
+                queue.append(neighbor)
+    
+    L_tree = [(parent_map[j], j) for j in parent_map]
+
+    print(L_tree)
+
+    # # -------------------------
+    # # Pretty printing
+    # # -------------------------
+    # print("\n==============================")
+    # print("PARENT MAP (child -> parent)")
+    # print("==============================")
+    # for child in sorted(parent_map.keys()):
+    #     print(f"{child:>5}  →  {parent_map[child]}")
+
+    # print("\n==============================")
+    # print("CHILDREN MAP (parent -> children)")
+    # print("==============================")
+    # for parent in sorted(children_map.keys()):
+    #     print(f"{parent:>5}  →  {children_map[parent]}")
+
+
+    # # -------------------------
+    # # Optional: sanity checks
+    # # -------------------------
+    # all_children = set(parent_map.keys())
+    # all_parents = set(children_map.keys())
+
+    # roots = all_parents - all_children
+    # leaves = all_children - all_parents
+
+    # print("\n==============================")
+    # print("STRUCTURE CHECK")
+    # print("==============================")
+    # print(f"Root nodes (no parent in map): {sorted(roots)}")
+    # print(f"Leaf nodes (no children): {sorted(leaves)}")
+    # print(f"Total edges: {len(L)}")
+    # print(f"Unique parents: {len(all_parents)}")
+    # print(f"Unique children: {len(all_children)}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     # ---------------------------
     # Check if edges create a Radial graph
@@ -53,20 +228,24 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     # Line capacities (kW)
     # ---------------------------
-
     Pmax_line = {}
+    for (i, j) in L_tree:
 
-    for _, row in net.line.iterrows():
-        i = int(row.from_bus)
-        j = int(row.to_bus)
+        match = net.line[(net.line.from_bus == i) & (net.line.to_bus == j)] # Try direct match
 
-        if i == slack_bus or j == slack_bus:
-            continue
+        if match.empty:
+            match = net.line[(net.line.from_bus == j) & (net.line.to_bus == i)]  # If not found → try reversed direction
+
+        # Still not found
+        if match.empty:
+            raise ValueError(f"No physical line found for edge ({i}, {j})")
+        row = match.iloc[0]
 
         I_max = row.max_i_ka
         V_kv = net.bus.vn_kv.at[i]
+        S_max_MVA = np.sqrt(3) * V_kv * I_max # Apparent power limit (3-phase)
 
-        S_max_MVA = np.sqrt(3) * V_kv * I_max
+        # Store using tree orientation (i → j)
         Pmax_line[(i, j)] = S_max_MVA * 1000  # kW
 
 
@@ -136,14 +315,22 @@ def extract_network_data(net, verbose=False):
     r_pu = {}
     x_pu = {}
 
-    for _, row in net.line.iterrows():
-        i = int(row.from_bus)
-        j = int(row.to_bus)
+    for (i, j) in L_tree:
 
-        if i == slack_bus or j == slack_bus:
-            continue
+        # Try direct match
+        match = net.line[(net.line.from_bus == i) & (net.line.to_bus == j)]
 
-        # Physical impedance (IMPORTANT: include length!)
+        # If not found → try reversed
+        if match.empty:
+            match = net.line[(net.line.from_bus == j) & (net.line.to_bus == i)]
+
+        # If still not found → error (or handle switches)
+        if match.empty:
+            raise ValueError(f"No physical line found for edge ({i}, {j})")
+
+        row = match.iloc[0]
+
+        # Physical impedance (include length!)
         r_ohm = row.r_ohm_per_km * row.length_km
         x_ohm = row.x_ohm_per_km * row.length_km
 
@@ -267,10 +454,68 @@ def extract_network_data(net, verbose=False):
         except Exception as e:
             print(f"Plot failed: {e}")
 
+
+
+    # # -------------------------
+    # # Build graph from L
+    # # -------------------------
+    # G = nx.DiGraph()
+
+    # for (i, j) in L:
+    #     G.add_edge(i, j)
+
+
+    # # -------------------------
+    # # Layout (tree-like)
+    # # -------------------------
+    # pos = nx.spring_layout(G, seed=46)  # stable layout
+
+    # # -------------------------
+    # # Draw graph
+    # # -------------------------
+    # plt.figure(figsize=(10, 6))
+
+    # nx.draw(
+    #     G,
+    #     pos,
+    #     with_labels=True,
+    #     node_size=200,        # smaller blobs
+    #     node_color="lightblue",
+    #     arrows=True,
+    #     arrowsize=15,
+    #     font_size=9,
+    #     width=1.2
+    # )
+
+    # # -------------------------
+    # # Add explicit labels (bus numbers again, clearer)
+    # # -------------------------
+    # labels = {node: str(node) for node in G.nodes()}
+    # nx.draw_networkx_labels(G, pos, labels, font_size=10)
+
+    # plt.title("Distribution Network (Parent → Children)")
+    # plt.axis("off")
+    # plt.tight_layout()
+    # plt.show()
+    
+
+    # Nodes that should have a parent but don't
+    nodes_without_parent = [
+        j for j in B
+        if j != slack_bus and j not in parent_map
+    ]
+    for j in nodes_without_parent:
+        # print(f"Adding missing edge: ({slack_bus} -> {j})")
+        L_tree.append((slack_bus, j))
+
+    B0 = [slack_bus] + B
+
     return {
         "B": B,
-        "B_prime": B_prime,
-        "L": L,
+        "B_prime": B0,
+        "L": L_tree,
+        "parent_map": parent_map,
+        "children_map": children_map,
         "Pmax_line": Pmax_line,
         "Pmax_sub": Pmax_sub,
         "S_base_MVA": S_base_MVA,

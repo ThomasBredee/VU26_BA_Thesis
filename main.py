@@ -3,12 +3,13 @@ from config import (
     TIME,
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
     CE, CP, SOC_MIN, SOC_MAX,
-    PV_SHARE
+    PV_SHARE,
+    BATTERY_EFFICIENCY, ALPHA, C_DEG
 )
 
 from src.input.extract_network import extract_network_data
 from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
-from src.input.preprocess_data import build_pD, build_pQ, test_network, build_PV, generate_base_PV, network_limits
+from src.input.preprocess_data import build_pD, build_qD, test_network, build_PV, generate_base_PV, build_S_inv
 
 # from models.depracted_old_models.basic_model import build_model
 # from models.depracted_old_models.model_PV import build_model_PV
@@ -43,10 +44,10 @@ def main():
         T=data['T'],
         base_demand=base_demand,
         profile=demand_data_percentages,
-        verbose=True
+        verbose=False
     )
 
-    data['pQ'] = build_pQ(qp_ratio, data['pD'])
+    data['qD'] = build_qD(qp_ratio, data['pD'])
 
     data["MP"] = data["Pmax_sub"]
     data["ME"] = data["Pmax_sub"] * 12 #making it a 12 hour battery, more free then before.
@@ -59,6 +60,11 @@ def main():
         profile=PV_data_percentages,
         verbose=False
     )
+    data['S_inv'] =  build_S_inv(data['B'], data['T'], data['PV'])
+
+    data['eta'] = BATTERY_EFFICIENCY ** (0.5)
+    data['alpha'] = ALPHA
+    data['c_deg'] = C_DEG
 
     price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
@@ -70,14 +76,14 @@ def main():
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
         #t: 100000 for t in data['T']}
 
-    print("Building model constraints........")
-    model = build_model_reactive(data)
+    # print("Building model constraints........")
+    # model = build_model_reactive(data)
 
-    print("Solving model ....................")
-    results = solve_model(model, tee=True)
+    # print("Solving model ....................")
+    # results = solve_model(model, tee=True)
 
-    print("Extracting results................")
-    extract_results(model, results, data)
+    # print("Extracting results................")
+    # extract_results(model, results, data)
 
 
 
