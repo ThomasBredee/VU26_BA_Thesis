@@ -8,56 +8,7 @@ from collections import deque
 
 
 def extract_network_data(net, verbose=False):
-    # buses of interest
-    bus_a = 18
-    bus_b = 8
 
-    print("\n=== Searching in net.line ===")
-
-    matches = net.line[
-        ((net.line.from_bus == bus_a) & (net.line.to_bus == bus_b)) |
-        ((net.line.from_bus == bus_b) & (net.line.to_bus == bus_a))
-    ]
-
-    if not matches.empty:
-        print(matches[[
-            "from_bus", "to_bus",
-            "length_km",
-            "r_ohm_per_km", "x_ohm_per_km"
-        ]])
-    else:
-        print("❌ No line found between buses 18 and 8 in net.line")
-
-
-    # -------------------------
-    # Also check switches (VERY important in SimBench)
-    # -------------------------
-    print("\n=== Searching in net.switch ===")
-
-    switch_matches = net.switch[
-        ((net.switch.bus == bus_a) & (net.switch.element == bus_b)) |
-        ((net.switch.bus == bus_b) & (net.switch.element == bus_a))
-    ]
-
-    if not switch_matches.empty:
-        print(switch_matches)
-    else:
-        print("❌ No switch found between buses 18 and 8")    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     """
     Extract structural network data from a pandapower network.
 
@@ -76,18 +27,14 @@ def extract_network_data(net, verbose=False):
     # Slack bus
     # ---------------------------
     slack_bus = int(net.ext_grid.bus.iloc[0])
-    B_prime = [slack_bus]
-
-
-    # Check transformer connections
-    print(net.trafo[['hv_bus', 'lv_bus', 'sn_mva']])
-    for _, row in net.trafo.iterrows():
-        print(row)
+    B_sub = [slack_bus]
 
     # ---------------------------
     # Bus set (excluding slack)
     # ---------------------------
     B = [int(b) for b in net.bus.index if int(b) != slack_bus]
+
+    B_0 = [slack_bus] + B
     
     # ---------------------------
     # Lines (edges), and Parent,Children maps.
@@ -96,19 +43,6 @@ def extract_network_data(net, verbose=False):
         (int(row.from_bus), int(row.to_bus))
         for _, row in net.line.iterrows()
     ]
-
-    #### THIS CODE DOES NOT WORK?! ####
-    # for line in L:
-    #     print(line)
-
-    # parent_map = {j: i for (i,j) in L}
-    # children_map = {}
-
-    # for (i, j) in L:
-    #     if i not in children_map:
-    #         children_map[i] = []
-    #     children_map[i].append(j)
-
 
     # Build undirected adjacency first
     adj = {}
@@ -139,72 +73,6 @@ def extract_network_data(net, verbose=False):
     
     L_tree = [(parent_map[j], j) for j in parent_map]
 
-    print(L_tree)
-
-    # # -------------------------
-    # # Pretty printing
-    # # -------------------------
-    # print("\n==============================")
-    # print("PARENT MAP (child -> parent)")
-    # print("==============================")
-    # for child in sorted(parent_map.keys()):
-    #     print(f"{child:>5}  →  {parent_map[child]}")
-
-    # print("\n==============================")
-    # print("CHILDREN MAP (parent -> children)")
-    # print("==============================")
-    # for parent in sorted(children_map.keys()):
-    #     print(f"{parent:>5}  →  {children_map[parent]}")
-
-
-    # # -------------------------
-    # # Optional: sanity checks
-    # # -------------------------
-    # all_children = set(parent_map.keys())
-    # all_parents = set(children_map.keys())
-
-    # roots = all_parents - all_children
-    # leaves = all_children - all_parents
-
-    # print("\n==============================")
-    # print("STRUCTURE CHECK")
-    # print("==============================")
-    # print(f"Root nodes (no parent in map): {sorted(roots)}")
-    # print(f"Leaf nodes (no children): {sorted(leaves)}")
-    # print(f"Total edges: {len(L)}")
-    # print(f"Unique parents: {len(all_parents)}")
-    # print(f"Unique children: {len(all_children)}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -217,7 +85,6 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     # Check if edges create a Radial graph
     # ---------------------------
-    
     mg = nx.Graph()
     for _, row in net.line.iterrows():
         if row.in_service:
@@ -226,7 +93,7 @@ def extract_network_data(net, verbose=False):
     
 
     # ---------------------------
-    # Line capacities (kW)
+    # Line capacities (kW) - Apparent power limit
     # ---------------------------
     Pmax_line = {}
     for (i, j) in L_tree:
@@ -256,6 +123,10 @@ def extract_network_data(net, verbose=False):
     S_max_MVA = trafo.sn_mva
     Pmax_sub = S_max_MVA * 1000  # MW → kW
 
+    # -------------------------------------------------
+    # Transformer apparent power limit
+    # -------------------------------------------------
+    Pmax_line[(129, 14)] = trafo.sn_mva * 1000   # kVA
 
     # ---------------------------
     # Load per bus + yearly energy
@@ -268,7 +139,7 @@ def extract_network_data(net, verbose=False):
         * 1000
     )
 
-    load_factor = 0.4
+    load_factor = 0.2 #################################### TODO: this was 0.4, set to 0.2 for model feasibility
     E_year_kWh = P_base_kw * load_factor * 8760
     E_year_kWh_dict = E_year_kWh.to_dict()
 
@@ -305,6 +176,7 @@ def extract_network_data(net, verbose=False):
     # Per-unit base values
     # ---------------------------
     S_base_MVA = 1.0  # standard choice
+    S_base_kVA = S_base_MVA * 1000 # for later conversion!
     V_base_kV = net.bus.vn_kv.iloc[0]
     Z_base_ohm = (V_base_kV ** 2) / S_base_MVA  # Ω
 
@@ -338,9 +210,27 @@ def extract_network_data(net, verbose=False):
         r_pu[(i, j)] = r_ohm / Z_base_ohm
         x_pu[(i, j)] = x_ohm / Z_base_ohm
 
+    # -------------------------------------------------
+    # Transformer impedance in SYSTEM per-unit
+    # -------------------------------------------------
+    trafo = net.trafo.iloc[0]
 
+    vk_percent = trafo.vk_percent      # 6.0
+    vkr_percent = trafo.vkr_percent    # 1.2
 
+    # S_max_MVA = trafo.sn_mva         # 0.4 MVA
+    # S_base_MVA = S_base_MVA            # e.g. 1.0
 
+    r_trafo = (vkr_percent / 100)  # Resistance in transformer p.u.
+    z_trafo = (vk_percent / 100) # Total impedance in transformer p.u.
+    x_trafo = (z_trafo**2 - r_trafo**2)**0.5 # Reactance in transformer p.u.
+    scale = S_base_MVA / S_max_MVA # Convert to SYSTEM base
+
+    r_trafo_sys = r_trafo * scale
+    x_trafo_sys = x_trafo * scale
+
+    r_pu[(129, 14)] = r_trafo_sys
+    x_pu[(129, 14)] = x_trafo_sys
 
     # ---------------------------
     # Verbose output
@@ -508,19 +398,29 @@ def extract_network_data(net, verbose=False):
         # print(f"Adding missing edge: ({slack_bus} -> {j})")
         L_tree.append((slack_bus, j))
 
-    B0 = [slack_bus] + B
+
+    # Add transformer branch: 129 -> 14
+    parent_map[14] = 129
+
+    if 129 not in children_map:
+        children_map[129] = []
+
+    children_map[129].append(14)
+
 
     return {
         "B": B,
-        "B_prime": B0,
+        "B_0": B_0,
+        "B_sub": B_sub,
         "L": L_tree,
         "parent_map": parent_map,
         "children_map": children_map,
         "Pmax_line": Pmax_line,
         "Pmax_sub": Pmax_sub,
         "S_base_MVA": S_base_MVA,
-        "V_base_kV": V_base_kV,
-        "Z_base_ohm": Z_base_ohm,
+        "S_base_kVA": S_base_kVA,
+        # "V_base_kV": V_base_kV,
+        # "Z_base_ohm": Z_base_ohm,
         "r_pu": r_pu,
         "x_pu": x_pu
     }, E_year_kWh_dict, Q_base_kvar_dict, qp_ratio

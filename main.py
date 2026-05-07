@@ -4,7 +4,7 @@ from config import (
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
     CE, CP, SOC_MIN, SOC_MAX,
     PV_SHARE,
-    BATTERY_EFFICIENCY, ALPHA, C_DEG
+    BATTERY_EFFICIENCY, ALPHA, C_DEG, V_MIN, V_MAX
 )
 
 from src.input.extract_network import extract_network_data
@@ -52,7 +52,7 @@ def main():
     data["MP"] = data["Pmax_sub"]
     data["ME"] = data["Pmax_sub"] * 12 #making it a 12 hour battery, more free then before.
 
-    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, seed=42)
+    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE)
     data['PV'] = build_PV(
         B=data['B'],
         T=data['T'],
@@ -65,6 +65,8 @@ def main():
     data['eta'] = BATTERY_EFFICIENCY ** (0.5)
     data['alpha'] = ALPHA
     data['c_deg'] = C_DEG
+    data['V_min'] = V_MIN
+    data['V_max'] = V_MAX
 
     price_series = load_year_prices(DATA_PATH_ELECTRICITY_PRICE, year=2025, verbose=False)
     data['c'] = convert_series_to_dict(price_series, data['T'])
@@ -76,14 +78,14 @@ def main():
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
         #t: 100000 for t in data['T']}
 
-    # print("Building model constraints........")
-    # model = build_model_reactive(data)
+    print("Building model constraints........")
+    model = build_model_reactive(data)
 
-    # print("Solving model ....................")
-    # results = solve_model(model, tee=True)
+    print("Solving model ....................")
+    results = solve_model(model, tee=True)
 
-    # print("Extracting results................")
-    # extract_results(model, results, data)
+    print("Extracting results................")
+    extract_results(model, results, data)
 
 
 

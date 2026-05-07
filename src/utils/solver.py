@@ -10,7 +10,7 @@ def solve_model(model, tee=False):
     solver = SolverFactory("gurobi")
 
     # Optional solver settings
-    solver.options['TimeLimit'] = 600      # seconds
+    # solver.options['TimeLimit'] = 600      # seconds
     # solver.options['MIPGap'] = 0.005        # 0.5% optimality gap
 
     results = solver.solve(model, tee=tee)

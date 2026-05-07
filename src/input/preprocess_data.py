@@ -45,26 +45,13 @@ def test_network(net):
 
 
 
-def generate_base_PV(B, base_demand, pv_share, n_pv=8, seed=42):
-
-    rng = np.random.default_rng(seed)
-    B = list(B)
-
-    total_demand = sum(base_demand[b] for b in B)
-    total_PV_target = pv_share * total_demand
-
-    pv_buses = set(rng.choice(B, size=min(n_pv, len(B)), replace=False))
-
+def generate_base_PV(B, base_demand, pv_penetration):
     base_PV = {}
 
-    total_demand_pv_buses = sum(base_demand[b] for b in pv_buses)
     for b in B:
-        if b in pv_buses and total_demand_pv_buses > 0:
-            share = base_demand[b] / total_demand_pv_buses
-            base_PV[b] = share * total_PV_target
-        else:
-            base_PV[b] = 0.0  # IMPORTANT: explicitly zero
-
+        demand = base_demand.get(b, 0)
+        # PV energy proportional to local demand
+        base_PV[b] = pv_penetration * demand
     return base_PV
 
 def normalize_profile(profile):

@@ -8,11 +8,6 @@ TIME = 8760
 DATA_PATH_DEMAND = "data/Standaardprofielen elektriciteit 2026 versie 1.00.csv"
 DATA_PATH_ELECTRICITY_PRICE = "data/Netherlands hourly electricity price.csv"
 
-WEIGHT_ENERGY_COST = 20
-WEIGHT_INVESTMENT_COST = 1
-WEIGHT_CURTAILMENT_COST = 1
-WEIGHT_DEGRADATION_PENALTY = 0.1
-WEIGHT_SLACK_PENALTY = 10000
 
 BATTERY_EFFICIENCY = 0.95
 
@@ -31,8 +26,8 @@ def degradation_cost_per_kwh(cE, N_cycles):
 n_cycles = 5000
 C_DEG = degradation_cost_per_kwh(CE, n_cycles)
 
-
-
+V_MIN = 0.95 
+V_MAX = 1.05
 
 SOC_MIN = 0.2
 SOC_MAX = 0.8
