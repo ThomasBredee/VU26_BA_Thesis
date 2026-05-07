@@ -32,9 +32,7 @@ import matplotlib.pyplot as plt
 from pyomo.environ import value
 from datetime import datetime
 
-
-
-
+from config import *
 
 
 # ============================================================
@@ -53,6 +51,7 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     os.makedirs(f"{output_dir}/figures", exist_ok=True)
 
     # Export all outputs
+    export_config_settings(data, output_dir)
     export_objective_results(model, data, output_dir)
     export_substation_results(model, data, output_dir)
     export_battery_results(model, data, output_dir)
@@ -65,6 +64,86 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     print(f"\nResults exported to: {output_dir}")
 
 
+# ============================================================
+# CONFIG EXPORT
+# ============================================================
+def export_config_settings(data, output_dir):
+
+    config_dict = {
+
+        # -------------------------
+        # Experiment
+        # -------------------------
+        "VERSIONING_TITLE": VERSIONING_TITLE,
+
+        # -------------------------
+        # Network
+        # -------------------------
+        "NETWORK_CHOICE": "1-LV-semiurb4--0-sw",
+
+        # -------------------------
+        # Simulation Horizon
+        # -------------------------
+        "TIME_HOURS": TIME,
+
+        # -------------------------
+        # Data Sources
+        # -------------------------
+        "DATA_PATH_DEMAND": DATA_PATH_DEMAND,
+        "DATA_PATH_ELECTRICITY_PRICE": DATA_PATH_ELECTRICITY_PRICE,
+
+        # -------------------------
+        # Battery
+        # -------------------------
+        "BATTERY_EFFICIENCY": BATTERY_EFFICIENCY,
+        "CP_EUR_PER_KW": CP,
+        "CE_EUR_PER_KWH": CE,
+
+        # -------------------------
+        # Financial
+        # -------------------------
+        "DISCOUNT_RATE": r_discount,
+        "BATTERY_LIFETIME_YEARS": l_battery,
+        "ALPHA": ALPHA,
+
+        # -------------------------
+        # Degradation
+        # -------------------------
+        "BATTERY_CYCLES": n_cycles,
+        "C_DEG_EUR_PER_KWH": C_DEG,
+
+        # -------------------------
+        # Voltage Limits
+        # -------------------------
+        "V_MIN_PU": V_MIN,
+        "V_MAX_PU": V_MAX,
+
+        # -------------------------
+        # SOC Limits
+        # -------------------------
+        "SOC_MIN": SOC_MIN,
+        "SOC_MAX": SOC_MAX,
+
+        # -------------------------
+        # PV
+        # -------------------------
+        "PV_SHARE": PV_SHARE,
+
+        # -------------------------
+        # Per-unit Base
+        # -------------------------
+        "S_BASE_KVA": data["S_base_kVA"]
+    }
+
+    df = pd.DataFrame(
+        list(config_dict.items()),
+        columns=["parameter", "value"]
+    )
+
+    df.to_csv(
+        f"{output_dir}/config_settings.csv",
+        index=False
+    )
 # ============================================================
 # 1. OBJECTIVE / ECONOMICS
 # ============================================================

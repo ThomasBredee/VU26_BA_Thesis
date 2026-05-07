@@ -30,7 +30,7 @@ from src.utils.results_plotting import *
 from src.utils.results_export import *
 
 def main():
-    print('Starting pipeline................. \n')
+    print('Starting pipeline.................')
 
     # Create network
     net = NETWORK_CHOICE 
@@ -54,8 +54,8 @@ def main():
 
     data['qD'] = build_qD(qp_ratio, data['pD'])
 
-    data["MP"] = data["Pmax_sub"]
-    data["ME"] = data["Pmax_sub"] * 12 #making it a 12 hour battery, more free then before.
+    # data["MP"] = data["Pmax_sub"]
+    # data["ME"] = data["Pmax_sub"] * 12 #making it a 12 hour battery, more free then before.
 
     base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE)
     data['PV'] = build_PV(
