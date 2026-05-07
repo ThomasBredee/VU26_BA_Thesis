@@ -23,6 +23,15 @@ def extract_network_data(net, verbose=False):
             - E_year_kWh_dict: yearly energy per bus
     """
 
+     # ---------------------------
+    # Per-unit base values
+    # ---------------------------
+    S_base_MVA = 1.0  # standard choice
+    S_base_kVA = S_base_MVA * 1000 # for later conversion!
+    V_base_kV = net.bus.vn_kv.iloc[0]
+    Z_base_ohm = (V_base_kV ** 2) / S_base_MVA  # Ω
+
+
     # ---------------------------
     # Slack bus
     # ---------------------------
@@ -74,14 +83,6 @@ def extract_network_data(net, verbose=False):
     L_tree = [(parent_map[j], j) for j in parent_map]
 
 
-
-
-
-
-
-
-
-    
     # ---------------------------
     # Check if edges create a Radial graph
     # ---------------------------
@@ -113,7 +114,7 @@ def extract_network_data(net, verbose=False):
         S_max_MVA = np.sqrt(3) * V_kv * I_max # Apparent power limit (3-phase)
 
         # Store using tree orientation (i → j)
-        Pmax_line[(i, j)] = S_max_MVA * 1000  # kW
+        Pmax_line[(i, j)] = S_max_MVA / S_base_MVA#* 1000  # kW Unit conversion to p.u.
 
 
     # ---------------------------
@@ -121,12 +122,12 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     trafo = net.trafo.iloc[0]
     S_max_MVA = trafo.sn_mva
-    Pmax_sub = S_max_MVA * 1000  # MW → kW
+    Pmax_sub = S_max_MVA / S_base_MVA#* 1000  # MW → kW
 
     # -------------------------------------------------
     # Transformer apparent power limit
     # -------------------------------------------------
-    Pmax_line[(129, 14)] = trafo.sn_mva * 1000   # kVA
+    Pmax_line[(129, 14)] = trafo.sn_mva / S_base_MVA #* 1000   # kVA
 
     # ---------------------------
     # Load per bus + yearly energy
@@ -139,9 +140,9 @@ def extract_network_data(net, verbose=False):
         * 1000
     )
 
-    load_factor = 0.2 #################################### TODO: this was 0.4, set to 0.2 for model feasibility
-    E_year_kWh = P_base_kw * load_factor * 8760
-    E_year_kWh_dict = E_year_kWh.to_dict()
+    load_factor = 1.0 ################################################################TODO: THIS could be much smaller to be less constrained
+    E_year_pu = (P_base_kw/S_base_kVA) * load_factor * 8760
+    E_year_pu_dict = E_year_pu.to_dict()
 
 
     # ---------------------------
@@ -154,7 +155,9 @@ def extract_network_data(net, verbose=False):
         .reindex(B, fill_value=0)
         * 1000  # MVar → kVar
     )
-    Q_base_kvar_dict = Q_base_kvar.to_dict()
+    Q_base_pu = Q_base_kvar / S_base_kVA
+    Q_base_pu_dict = Q_base_pu.to_dict()
+    #Q_base_kvar_dict = Q_base_kvar.to_dict()
 
 
     # ---------------------------
@@ -170,15 +173,6 @@ def extract_network_data(net, verbose=False):
             qp_ratio[b] = q / p
         else:
             qp_ratio[b] = 0.0
-
-
-    # ---------------------------
-    # Per-unit base values
-    # ---------------------------
-    S_base_MVA = 1.0  # standard choice
-    S_base_kVA = S_base_MVA * 1000 # for later conversion!
-    V_base_kV = net.bus.vn_kv.iloc[0]
-    Z_base_ohm = (V_base_kV ** 2) / S_base_MVA  # Ω
 
 
     # ---------------------------
@@ -423,4 +417,4 @@ def extract_network_data(net, verbose=False):
         # "Z_base_ohm": Z_base_ohm,
         "r_pu": r_pu,
         "x_pu": x_pu
-    }, E_year_kWh_dict, Q_base_kvar_dict, qp_ratio
+    }, E_year_pu_dict, Q_base_pu_dict, qp_ratio

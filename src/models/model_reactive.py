@@ -93,21 +93,21 @@ def build_model_reactive(data):
     # -------------------------
     def obj_rule(m):
         energy_cost = sum(
-            m.c[t] * m.P_sub[s, t] * m.dt
+            m.c[t] * (m.P_sub[s, t] * data['S_base_kVA']) * m.dt
             for s in m.B_sub
             for t in m.T
         )
         investment_cost = m.alpha * sum(
-            m.cP * m.Pmax[i] + m.cE * m.Emax[i]
+            m.cP * m.Pmax[i] * data['S_base_kVA'] + m.cE * m.Emax[i] * data['S_base_kVA']
             for i in m.B
         )
         degradation_cost = m.c_deg * sum(
-            (m.pCHA[i, t] + m.pDIS[i, t]) * m.dt
+            (m.pCHA[i, t] + m.pDIS[i, t]) * data['S_base_kVA'] * m.dt
             for i in m.B
             for t in m.T
         )
         curtailment_cost = sum(
-            m.c_curt[t] * m.pPV_curt[i, t] * m.dt
+            m.c_curt[t] * m.pPV_curt[i, t] * data['S_base_kVA'] * m.dt
             for i in m.B
             for t in m.T
         )

@@ -4,7 +4,8 @@ from config import (
     DATA_PATH_DEMAND, DATA_PATH_ELECTRICITY_PRICE,
     CE, CP, SOC_MIN, SOC_MAX,
     PV_SHARE,
-    BATTERY_EFFICIENCY, ALPHA, C_DEG, V_MIN, V_MAX
+    BATTERY_EFFICIENCY, ALPHA, C_DEG, V_MIN, V_MAX, 
+    VERSIONING_TITLE
 )
 
 from src.input.extract_network import extract_network_data
@@ -24,12 +25,16 @@ from src.utils.plotting import (
     plot_hourly_pattern
 )
 
+from src.utils.results import *
+from src.utils.results_plotting import *
+from src.utils.results_export import *
+
 def main():
     print('Starting pipeline................. \n')
 
     # Create network
     net = NETWORK_CHOICE 
-    test_network(net)
+    # test_network(net)
 
     data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
 
@@ -78,15 +83,18 @@ def main():
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} #as a curtailment price, take the energy price, or when negative 0.
         #t: 100000 for t in data['T']}
 
+
     print("Building model constraints........")
     model = build_model_reactive(data)
 
     print("Solving model ....................")
-    results = solve_model(model, tee=True)
+    solved_model = solve_model(model, tee=True)
 
-    print("Extracting results................")
-    extract_results(model, results, data)
+    if solved_model:
+        # extract_results(model, results, data)
 
+        print("Exporting thesis results........")
+        export_thesis_results(model, data, versioning=VERSIONING_TITLE)
 
 
 

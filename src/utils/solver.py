@@ -15,7 +15,15 @@ def solve_model(model, tee=False):
 
     results = solver.solve(model, tee=tee)
 
-    return results
+    tc = results.solver.termination_condition
+
+    if tc == TerminationCondition.optimal:
+        print("✅ Optimal solution found\n")
+        return True
+    else:
+        print(f"⚠️ Solver status: {tc}")
+        print("Skipping result extraction (solution may be invalid)\n")
+        return False
 
 
 
