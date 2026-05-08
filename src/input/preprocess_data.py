@@ -38,10 +38,17 @@ def test_network(net):
     loading = net.res_line.loading_percent
 
     max_loading = loading.max()
-    max_line = loading.idxmax()
+    max_line_idx = loading.idxmax()
+
+    # Get physical line info
+    from_bus = net.line.loc[max_line_idx, "from_bus"]
+    to_bus = net.line.loc[max_line_idx, "to_bus"]
 
     print("\n[Line Loading]")
-    print(f"Max loading        : {max_loading:.2f} % (Line {max_line})")
+    print(
+        f"Max loading        : {max_loading:.2f} % "
+        f"(Line {from_bus} -> {to_bus})"
+    )
 
 
 

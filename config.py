@@ -2,17 +2,9 @@ import pandapower.networks as pn
 from simbench.networks import get_simbench_net
 
 
-
-
-
-VERSIONING_TITLE = "demand_var_at_1.0"
-
-
-
-
+VERSIONING_TITLE = "0_batteries_and_PV"
 
 NETWORK_CHOICE = get_simbench_net("1-LV-semiurb4--0-sw")
-
 TIME = 8760
 
 DATA_PATH_DEMAND = "data/Standaardprofielen elektriciteit 2026 versie 1.00.csv"
@@ -42,4 +34,4 @@ V_MAX = 1.05
 SOC_MIN = 0.2
 SOC_MAX = 0.8
 
-PV_SHARE = 0.15 #15 percent of demand is gerated by PV 
+PV_SHARE = 0 #[0.0, 0.25, 0.50, 0.75, 1.0] #TODO: Run all these with a for-loop later.

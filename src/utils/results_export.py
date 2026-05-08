@@ -44,7 +44,7 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     timestamp = datetime.now().strftime("%m%d_%H%M")
 
     # Create versioned root folder
-    output_dir = f"{timestamp}_{results_dir}_{versioning}"
+    output_dir = f"{results_dir}_{timestamp}_{versioning}"
 
     # Create directories
     os.makedirs(output_dir, exist_ok=True)
@@ -54,12 +54,12 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     export_config_settings(data, output_dir)
     export_objective_results(model, data, output_dir)
     export_substation_results(model, data, output_dir)
-    export_battery_results(model, data, output_dir)
-    export_soc_results(model, data, output_dir)
     export_line_flow_results(model, data, output_dir)
-    export_pv_results(model, data, output_dir)
     export_voltage_results(model, data, output_dir)
     export_constraint_violations(model, data, output_dir)
+    export_battery_results(model, data, output_dir)
+    export_soc_results(model, data, output_dir)
+    export_pv_results(model, data, output_dir)
 
     print(f"\nResults exported to: {output_dir}")
 
@@ -144,6 +144,36 @@ def export_config_settings(data, output_dir):
         f"{output_dir}/config_settings.csv",
         index=False
     )
+
+
+# ============================================================
+# VOLTAGE EXPORT
+# ============================================================
+def export_voltage_results(model, data, output_dir):
+
+    rows = []
+
+    for i in model.B0:
+        for t in model.T:
+
+            # model.v is squared voltage magnitude
+            v_sq = value(model.v[i, t])
+
+            # convert back to normal p.u. voltage
+            v_pu = v_sq ** 0.5
+
+            rows.append({
+                "bus": int(i),
+                "time": int(t),
+                "v_pu": v_pu,
+                "v_sq_pu": v_sq
+            })
+
+    df = pd.DataFrame(rows)
+
+    df.to_csv(f"{output_dir}/voltage_profiles.csv", index=False)
+
+
 # ============================================================
 # 1. OBJECTIVE / ECONOMICS
 # ============================================================
@@ -485,28 +515,28 @@ def export_line_flow_results(model, data, results_dir):
         plt.close()
 
 
-# ============================================================
-# 7. VOLTAGES
-# ============================================================
+# # ============================================================
+# # 7. VOLTAGES
+# # ============================================================
 
-def export_voltage_results(model, data, results_dir):
+# def export_voltage_results(model, data, results_dir):
 
-    rows = []
+#     rows = []
 
-    for i in model.B0:
-        for t in model.T:
+#     for i in model.B0:
+#         for t in model.T:
 
-            v_sq = value(model.v[i, t])
+#             v_sq = value(model.v[i, t])
 
-            rows.append({
-                "bus": i,
-                "time": t,
-                "voltage_pu": np.sqrt(v_sq)
-            })
+#             rows.append({
+#                 "bus": i,
+#                 "time": t,
+#                 "voltage_pu": np.sqrt(v_sq)
+#             })
 
-    df = pd.DataFrame(rows)
+#     df = pd.DataFrame(rows)
 
-    df.to_csv(f"{results_dir}/voltage_profiles.csv", index=False)
+#     df.to_csv(f"{results_dir}/voltage_profiles.csv", index=False)
 
 
 # ============================================================

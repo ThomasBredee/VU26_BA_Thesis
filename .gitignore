@@ -30,8 +30,8 @@ figures/
 *.png
 *.jpg
 
-# # Thesis result exports
-# results_*/
+# Thesis result exports
+results_*/
 
 # Logs
 *.log

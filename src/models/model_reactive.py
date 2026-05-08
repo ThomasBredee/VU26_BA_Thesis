@@ -120,17 +120,17 @@ def build_model_reactive(data):
 
     # NOTE: THESE 2 CONSTRAINTS ARE JUST KEPT HERE FOR QUICK DEBUGGING RUNS..................
     # # Fixing batteries of the model OR force battery placement somewhere:
-    # def fixing_batteries(m, i):
-    #     if i in [17, 32]: #17 does not work with 200A, 32 is behind the biggest.
+    # def fixing_batteries(m,i ):
+    #     if i in [17, 32]:
     #         return m.b[i] == 1
     #     else:
     #         return m.b[i] == 0
     # model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
 
     # #OR this battery rule:
-    # def battery_budget_rule(m):
-    #     return sum(m.b[i] for i in m.B) <= 1
-    # model.BatteryBudget = Constraint(rule=battery_budget_rule)
+    def battery_budget_rule(m):
+        return sum(m.b[i] for i in m.B) <= 0
+    model.BatteryBudget = Constraint(rule=battery_budget_rule)
     
 
 
@@ -164,13 +164,13 @@ def build_model_reactive(data):
 
         # # Substation active balance
     def substation_balance_P(m, t):
-        s = list(m.B0)[0]
+        s = list(m.B_sub)[0]
         return m.P_sub[s, t] == sum(m.P[i, j, t] for (i, j) in m.L if i == s)
     model.SubstationP = Constraint(model.T, rule=substation_balance_P)
 
     # Substation reactive balance
     def substation_balance_Q(m, t):
-        s = list(m.B0)[0]
+        s = list(m.B_sub)[0]
         return m.Q_sub[s, t] == sum(m.Q[i, j, t] for (i, j) in m.L if i == s)
     model.SubstationQ = Constraint(model.T, rule=substation_balance_Q)
 

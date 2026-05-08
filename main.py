@@ -29,12 +29,16 @@ from src.utils.results import *
 from src.utils.results_plotting import *
 from src.utils.results_export import *
 
+from src.utils.robustness_check import *
+
 def main():
     print('Starting pipeline.................')
 
     # Create network
     net = NETWORK_CHOICE 
+    
     # test_network(net)
+    # robustness_checker()
 
     data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
 
@@ -84,47 +88,22 @@ def main():
         #t: 100000 for t in data['T']}
 
 
-    print("Building model constraints........")
-    model = build_model_reactive(data)
+    # print("Building model constraints........")
+    # model = build_model_reactive(data)
 
-    print("Solving model ....................")
-    solved_model = solve_model(model, tee=True)
+    # print("Solving model ....................")
+    # solved_model = solve_model(model, tee=True)
 
-    if solved_model:
-        # extract_results(model, results, data)
+    # if solved_model:
+    #     # extract_results(model, results, data)
 
-        print("Exporting thesis results........")
-        export_thesis_results(model, data, versioning=VERSIONING_TITLE)
+    #     print("Exporting thesis results........")
+    #     export_thesis_results(model, data, versioning=VERSIONING_TITLE)
 
-
-
-    # #Testing:
-    # system_balance_check = False
-    # if system_balance_check:
-    #     print("\n=== System balance check ===")
-    #     T_list = list(model.T)
-
-    #     for t in T_list[0:50]:
-    #         total_demand = sum(data['pD'].get((i, t), 0) for i in model.B)
-    #         total_discharge = sum(model.pDIS[i, t].value for i in model.B)
-    #         total_charge = sum(model.pCHA[i, t].value for i in model.B)
-    #         total_sub = sum(model.P_sub[s, t].value for s in model.B_prime)
-
-    #         net_battery = total_discharge - total_charge
-
-    #         print(f"t={t}: demand={total_demand:.2f}, "
-    #             f"battery_net={net_battery:.2f}, "
-    #             f"substation={total_sub:.2f}")
-        
-    #     # T_list = list(model.T)
-
-    #     # for i in model.B:
-    #     #     soc_values = [model.E[i, t].value for t in T_list[:50]]
-    #     #     print(f"Bus {i}: {soc_values}")
+    # print("Pipeline executed successfully.")
+    
 
 
-
-    print("Pipeline executed successfully.")
 
      
 if __name__ == "__main__":

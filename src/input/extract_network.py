@@ -28,7 +28,7 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     S_base_MVA = 1.0  # standard choice
     S_base_kVA = S_base_MVA * 1000 # for later conversion!
-    V_base_kV = net.bus.vn_kv.iloc[0]
+    V_base_kV = float(net.bus.vn_kv.loc[net.trafo.lv_bus.iloc[0]]) #net.bus.vn_kv.iloc[0] #replaced by a more robust version...
     Z_base_ohm = (V_base_kV ** 2) / S_base_MVA  # Ω
 
 
@@ -36,6 +36,9 @@ def extract_network_data(net, verbose=False):
     # Slack bus
     # ---------------------------
     slack_bus = int(net.ext_grid.bus.iloc[0])
+
+    slack_bus = int(net.ext_grid.bus.iloc[0]) # 129, MV side
+    lv_root  = int(net.trafo.lv_bus.iloc[0])  # 14,  LV side
     B_sub = [slack_bus]
 
     # ---------------------------
@@ -62,9 +65,9 @@ def extract_network_data(net, verbose=False):
     parent_map = {}
     children_map = {}
     visited = set()
-    queue = deque([14]) #SET 14 here as starting point (slack_bus does not work...)
+    queue = deque([lv_root]) #SET 14 here as starting point (slack_bus does not work...)
 
-    visited.add(14)
+    visited.add(lv_root)
 
     while queue:
         parent = queue.popleft()
@@ -111,10 +114,10 @@ def extract_network_data(net, verbose=False):
 
         I_max = row.max_i_ka
         V_kv = net.bus.vn_kv.at[i]
-        S_max_MVA = np.sqrt(3) * V_kv * I_max # Apparent power limit (3-phase)
+        S_max_line_MVA = np.sqrt(3) * V_kv * I_max # Apparent power limit (3-phase)
 
         # Store using tree orientation (i → j)
-        Pmax_line[(i, j)] = S_max_MVA / S_base_MVA#* 1000  # kW Unit conversion to p.u.
+        Pmax_line[(i, j)] = S_max_line_MVA / S_base_MVA#* 1000  # kW Unit conversion to p.u.
 
 
     # ---------------------------
@@ -127,7 +130,7 @@ def extract_network_data(net, verbose=False):
     # -------------------------------------------------
     # Transformer apparent power limit
     # -------------------------------------------------
-    Pmax_line[(129, 14)] = trafo.sn_mva / S_base_MVA #* 1000   # kVA
+    Pmax_line[(slack_bus, lv_root)] = trafo.sn_mva / S_base_MVA #* 1000   # kVA
 
     # ---------------------------
     # Load per bus + yearly energy
@@ -140,7 +143,7 @@ def extract_network_data(net, verbose=False):
         * 1000
     )
 
-    load_factor = 1.0 ################################################################TODO: THIS could be much smaller to be less constrained
+    load_factor = 0.25 ################################################################TODO: this will be the basis for the model.
     E_year_pu = (P_base_kw/S_base_kVA) * load_factor * 8760
     E_year_pu_dict = E_year_pu.to_dict()
 
@@ -223,8 +226,8 @@ def extract_network_data(net, verbose=False):
     r_trafo_sys = r_trafo * scale
     x_trafo_sys = x_trafo * scale
 
-    r_pu[(129, 14)] = r_trafo_sys
-    x_pu[(129, 14)] = x_trafo_sys
+    r_pu[(slack_bus, lv_root)] = r_trafo_sys
+    x_pu[(slack_bus, lv_root)] = x_trafo_sys
 
     # ---------------------------
     # Verbose output
@@ -302,7 +305,7 @@ def extract_network_data(net, verbose=False):
         print(f"Total P (snapshot)  : {total_P:.1f} kW")
         print(f"Total Q (snapshot)  : {total_Q:.1f} kvar")
 
-        total_energy = sum(E_year_kWh_dict.values())
+        total_energy = sum(E_year_pu_dict.values())
         print(f"Total annual energy : {total_energy:.1f} kWh")
 
         # ---------------------------
@@ -394,7 +397,7 @@ def extract_network_data(net, verbose=False):
 
 
     # Add transformer branch: 129 -> 14
-    parent_map[14] = 129
+    parent_map[lv_root] = slack_bus
 
     if 129 not in children_map:
         children_map[129] = []
