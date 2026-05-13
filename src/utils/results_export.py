@@ -57,9 +57,11 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     export_line_flow_results(model, data, output_dir)
     export_voltage_results(model, data, output_dir)
     export_constraint_violations(model, data, output_dir)
-    export_battery_results(model, data, output_dir)
-    export_soc_results(model, data, output_dir)
-    export_pv_results(model, data, output_dir)
+    if not NO_BATTERIES:
+        export_battery_results(model, data, output_dir)
+        export_soc_results(model, data, output_dir)
+    if PV_SHARE != 0:
+        export_pv_results(model, data, output_dir)
 
     print(f"\nResults exported to: {output_dir}")
 
@@ -445,20 +447,28 @@ def export_line_flow_results(model, data, results_dir):
     S_base = data['S_base_kVA']
 
     rows = []
-
     max_loading = {}
 
     for (i, j) in model.L:
 
+        # line thermal limit [kVA]
         limit = value(model.Smax_line[i, j]) * S_base
 
         loading_series = []
 
         for t in model.T:
 
-            p = value(model.P[i, j, t]) * S_base
+            # --------------------------------
+            # Convert from p.u. → physical units
+            # --------------------------------
+            p = value(model.P[i, j, t]) * S_base      # kW
+            q = value(model.Q[i, j, t]) * S_base      # kVar
 
-            loading = abs(p) / limit
+            # apparent power
+            s = np.sqrt(p**2 + q**2)                  # kVA
+
+            # loading
+            loading = s / limit
 
             loading_series.append(loading)
 
@@ -467,16 +477,26 @@ def export_line_flow_results(model, data, results_dir):
                 "to_bus": j,
                 "time": t,
                 "P_kW": p,
+                "Q_kVar": q,
+                "S_kVA": s,
                 "loading_percent": loading * 100
             })
 
         max_loading[(i, j)] = max(loading_series)
 
+    # ----------------------------------------
+    # Save CSV
+    # ----------------------------------------
     df = pd.DataFrame(rows)
 
-    df.to_csv(f"{results_dir}/line_flows.csv", index=False)
+    df.to_csv(
+        f"{results_dir}/line_flows.csv",
+        index=False
+    )
 
-    # Top 3 congested lines
+    # ----------------------------------------
+    # Plot top 3 congested lines
+    # ----------------------------------------
     top3 = sorted(
         max_loading.items(),
         key=lambda x: x[1],
@@ -494,16 +514,40 @@ def export_line_flow_results(model, data, results_dir):
 
         plt.figure(figsize=(14, 5))
 
-        plt.plot(df_line["time"], df_line["P_kW"])
+        # plot apparent power
+        plt.plot(
+            df_line["time"],
+            df_line["S_kVA"],
+            label="|S| [kVA]"
+        )
 
-        plt.axhline(limit, linestyle='--')
-        plt.axhline(-limit, linestyle='--')
+        # thermal limits
+        plt.axhline(
+            limit,
+            linestyle='--',
+            label="Line limit"
+        )
+
+        # highlight >90% loaded
+        high_loading = df_line[
+            df_line["loading_percent"] > 90
+        ]
+
+        plt.scatter(
+            high_loading["time"],
+            high_loading["S_kVA"],
+            marker='o',
+            label=">90% loaded"
+        )
 
         plt.xlabel("Time")
-        plt.ylabel("Power Flow [kW]")
+        plt.ylabel("Apparent Power [kVA]")
 
-        plt.title(f"Line Flow ({i} → {j})")
+        plt.title(
+            f"Line Flow ({i} → {j})"
+        )
 
+        plt.legend()
         plt.grid(True)
 
         plt.savefig(

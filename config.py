@@ -34,4 +34,10 @@ V_MAX = 1.05
 SOC_MIN = 0.2
 SOC_MAX = 0.8
 
+NO_BATTERIES = True
+
 PV_SHARE = 0 #[0.0, 0.25, 0.50, 0.75, 1.0] #TODO: Run all these with a for-loop later.
+PV_SCENARIO = 'WEAKEST_BUS_SEVERITY_SCORE'
+                # 'WEAKEST_BUS_SEVERITY_SCORE'
+                #'PV_EVERYWHERE'
+                # 'LINE_STABILITY_INDEX', 

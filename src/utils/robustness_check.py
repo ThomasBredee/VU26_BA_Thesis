@@ -1,4 +1,5 @@
 import pandas as pd    
+import pandapower as pp
 
 def robustness_checker():
     # ============================================================
@@ -108,3 +109,67 @@ def robustness_checker():
         f"(Bus {int(max_row['bus'])}, "
         f"t={int(max_row['time'])})"
     )
+
+    # print("\n==============================")
+    # print("NLSI (Optimization model)")
+    # print("==============================")
+
+    # df_flow = pd.read_csv(f"{RESULTS_DIR}/line_flows.csv")
+    # df_v = pd.read_csv(f"{RESULTS_DIR}/voltage_profiles.csv")
+
+    # max_nlsi = -1
+    # worst_line = None
+    # worst_time = None
+
+    # for _, row in df_flow.iterrows():
+
+    #     i = int(row["from_bus"])
+    #     j = int(row["to_bus"])
+    #     t = int(row["time"])
+
+    #     # --------------------------
+    #     # Power in p.u.
+    #     # --------------------------
+    #     P_pu = abs(row["P_kW"]) / data["S_base_kVA"]
+
+    #     # Need Q too
+    #     if "Q_kVar" in df_flow.columns:
+    #         Q_pu = abs(row["Q_kVar"]) / data["S_base_kVA"]
+    #     else:
+    #         Q_pu = 0
+
+    #     # --------------------------
+    #     # Sending voltage
+    #     # --------------------------
+    #     Vi = df_v[
+    #         (df_v["bus"] == i) &
+    #         (df_v["time"] == t)
+    #     ]["v_pu"].values[0]
+
+    #     # --------------------------
+    #     # Line impedance
+    #     # --------------------------
+    #     R = data["r_pu"][(i, j)]
+    #     X = data["x_pu"][(i, j)]
+
+    #     # --------------------------
+    #     # Compute NLSI
+    #     # --------------------------
+    #     nlsi = (R * P_pu + X * Q_pu) / (0.25 * Vi**2)
+
+    #     if nlsi > max_nlsi:
+    #         max_nlsi = nlsi
+    #         worst_line = (i, j)
+    #         worst_time = t
+
+    # print(f"Worst line         : {worst_line[0]} -> {worst_line[1]}")
+    # print(f"Worst time         : t={worst_time}")
+    # print(f"Maximum NLSI       : {max_nlsi:.6f}")
+
+    # if max_nlsi < 1:
+    #     print("Status             : STABLE")
+    # else:
+    #     print("Status             : UNSTABLE")
+    
+    
+

@@ -1,6 +1,7 @@
 from pyomo.environ import *
 from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
 import math
+from config import NO_BATTERIES
 
 def build_model_reactive(data):
 
@@ -128,10 +129,11 @@ def build_model_reactive(data):
     # model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
 
     # #OR this battery rule:
-    def battery_budget_rule(m):
-        return sum(m.b[i] for i in m.B) <= 0
-    model.BatteryBudget = Constraint(rule=battery_budget_rule)
-    
+    if NO_BATTERIES:
+        def battery_budget_rule(m):
+            return sum(m.b[i] for i in m.B) <= 0
+        model.BatteryBudget = Constraint(rule=battery_budget_rule)
+        
 
 
     # # Active power balance rule for all buses.

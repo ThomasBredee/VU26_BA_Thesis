@@ -2,9 +2,51 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
 import pandapower as pp
+import pandas as pd
+
+def NLSI_calculation(net):
+    # ---------
+    # Base values
+    # -----------------------------
+    S_base = net.sn_mva
+
+    # Sending buses
+    from_bus = net.line["from_bus"]
+
+    # -----------------------------
+    # Line impedance in pu
+    # -----------------------------
+    V_base = net.bus.loc[from_bus, "vn_kv"].values
+    Z_base = (V_base**2) / S_base
+
+    R = (net.line["r_ohm_per_km"] * net.line["length_km"]).values / Z_base
+    X = (net.line["x_ohm_per_km"] * net.line["length_km"]).values / Z_base
+
+    # -----------------------------
+    # Receiving-end line power (THIS is the key fix)
+    # -----------------------------
+    Pj = abs(net.res_line["p_to_mw"].values) / S_base
+    Qj = abs(net.res_line["q_to_mvar"].values) / S_base
+
+    # -----------------------------
+    # Sending-end voltage
+    # -----------------------------
+    Vi = net.res_bus.loc[from_bus, "vm_pu"].values
+
+    # -----------------------------
+    # NLSI
+    # -----------------------------
+    net.line["NLSI"] = (R * Pj + X * Qj) / (0.25 * Vi**2)
+
+    # Sort highest first
+    ranking = net.line.sort_values("NLSI", ascending=False)
+
+    print(ranking[["from_bus", "to_bus", "NLSI"]])
 
 def test_network(net):
     pp.runpp(net)
+
+    NLSI_calculation(net)
 
     # ---------------------------
     # Bus voltage statistics
@@ -52,13 +94,105 @@ def test_network(net):
 
 
 
-def generate_base_PV(B, base_demand, pv_penetration):
+
+
+def generate_base_PV(B, base_demand, pv_penetration, scenario):
     base_PV = {}
 
-    for b in B:
-        demand = base_demand.get(b, 0)
-        # PV energy proportional to local demand
-        base_PV[b] = pv_penetration * demand
+    if scenario == 'PV_EVERYWHERE':
+        for b in B:
+            demand = base_demand.get(b, 0)
+            # PV energy proportional to local demand
+            base_PV[b] = pv_penetration * demand
+    
+    if scenario == "WEAKEST_BUS_SEVERITY_SCORE":
+        # Initialize all buses with zero PV
+        for b in B:
+            base_PV[b] = 0.0
+
+        # ------------------------------------------
+        # Total PV budget
+        # ------------------------------------------
+        total_demand = sum(base_demand.values())
+
+        total_pv_budget = pv_penetration * total_demand
+
+        # ------------------------------------------
+        # Top 10 weakest buses
+        # ------------------------------------------
+        bus_ranking = pd.read_csv("data/bus_ranking_bus_voltage.csv")
+        top10 = bus_ranking.head(10).copy()
+
+        # columns expected:
+        # rank | bus | severity_score
+
+        # ------------------------------------------
+        # Normalize severity scores
+        # ------------------------------------------
+        total_severity = top10["severity_score"].sum()
+
+        top10["weight"] = (
+            top10["severity_score"] / total_severity
+        )
+
+        # ------------------------------------------
+        # Allocate PV
+        # ------------------------------------------
+        for _, row in top10.iterrows():
+
+            bus = int(row["bus"])
+            weight = row["weight"]
+
+            base_PV[bus] = (
+                weight * total_pv_budget
+            )
+
+    if scenario == "LINE_STABILITY_INDEX":
+
+        # Initialize all buses with zero PV
+        for b in B:
+            base_PV[b] = 0.0
+
+        # ------------------------------------------
+        # Total PV budget
+        # ------------------------------------------
+        total_demand = sum(base_demand.values())
+
+        total_pv_budget = (
+            pv_penetration * total_demand
+        )
+
+        # ------------------------------------------
+        # Top 10 weakest buses
+        # (highest NLSI)
+        # ------------------------------------------
+        bus_ranking = pd.read_csv("data/bus_ranking_NLSI.csv")
+        top10 = bus_ranking.head(10).copy()
+
+        # expected columns:
+        # rank | bus | nlsi_max
+
+        # ------------------------------------------
+        # Normalize NLSI scores
+        # ------------------------------------------
+        total_nlsi = top10["nlsi_max"].sum()
+
+        top10["weight"] = (
+            top10["nlsi_max"] / total_nlsi
+        )
+
+        # ------------------------------------------
+        # Allocate PV proportionally
+        # ------------------------------------------
+        for _, row in top10.iterrows():
+
+            bus = int(row["bus"])
+            weight = row["weight"]
+
+            base_PV[bus] = (
+                weight * total_pv_budget
+            )
+    
     return base_PV
 
 def normalize_profile(profile):
@@ -170,6 +304,214 @@ def build_S_inv(B, T, PV):
         S_inv[i] = 1.1 * peak_pv   # 10% headroom
 
     return S_inv
+
+def rank_buses_for_PV(pv_scenario, data, verbose = False):
+    if pv_scenario == 'WEAKEST_BUS_SEVERITY_SCORE':   
+        RESULTS_DIR = "results_0513_1123_0_batteries_and_PV"
+        
+        df = pd.read_csv(f"{RESULTS_DIR}/voltage_profiles.csv")
+
+        # expected columns:
+        # bus,time,v_pu,v_sq_pu
+
+        # ---------------------------------------------------
+        # Aggregate per bus
+        # ---------------------------------------------------
+        summary = (
+            df.groupby("bus")["v_pu"]
+            .agg(
+                v_min="min",
+                v_max="max",
+                v_mean="mean",
+                v_std="std"
+            )
+            .reset_index()
+        )
+
+        # ---------------------------------------------------
+        # Compute ranking metrics
+        # ---------------------------------------------------
+        summary["spread"] = summary["v_max"] - summary["v_min"]
+
+        summary["max_deviation"] = summary.apply(
+            lambda row: max(
+                abs(row["v_min"] - 1.0),
+                abs(row["v_max"] - 1.0)
+            ),
+            axis=1
+        )
+
+        # Combined severity score
+        summary["severity_score"] = (
+            summary["spread"] +
+            summary["max_deviation"]
+        )
+
+        # ---------------------------------------------------
+        # Rank worst -> best
+        # ---------------------------------------------------
+        summary = summary.sort_values(
+            "severity_score",
+            ascending=False
+        ).reset_index(drop=True)
+
+        summary["rank"] = summary.index + 1
+
+        # reorder columns
+        summary = summary[
+            [
+                "rank",
+                "bus",
+                "v_min",
+                "v_max",
+                "spread",
+                "max_deviation",
+                "v_mean",
+                "v_std",
+                "severity_score",
+            ]
+        ]
+        summary.to_csv(
+            "data/bus_ranking_bus_voltage.csv",
+            index=False
+        )
+        if verbose:
+            # ---------------------------------------------------
+            # Print top 10 worst buses
+            # ---------------------------------------------------
+            print("\n==============================")
+            print("BUS VOLTAGE RANKING (Worst → Best)")
+            print("==============================")
+
+            print(summary.head(40).to_string(index=False))
+        
+        return summary
+    
+    if pv_scenario == "LINE_STABILITY_INDEX":
+
+        RESULTS_DIR = "results_0513_1123_0_batteries_and_PV"
+
+        # ------------------------------------------
+        # Load exported model results
+        # ------------------------------------------
+        df_flow = pd.read_csv(
+            f"{RESULTS_DIR}/line_flows.csv"
+        )
+
+        df_v = pd.read_csv(
+            f"{RESULTS_DIR}/voltage_profiles.csv"
+        )
+
+        # Need Q values
+        # line_flows.csv should contain:
+        # from_bus,to_bus,time,P_kW,Q_kVar,...
+        if "Q_kVar" not in df_flow.columns:
+            raise ValueError(
+                "line_flows.csv must contain Q_kVar "
+                "for LINE_STABILITY_INDEX ranking."
+            )
+
+        # ------------------------------------------
+        # Convert to p.u.
+        # ------------------------------------------
+        S_base = 1000.0   # kVA (assuming 1 MVA base)
+
+        df_flow["P_pu"] = (
+            df_flow["P_kW"].abs() / S_base
+        )
+
+        df_flow["Q_pu"] = (
+            df_flow["Q_kVar"].abs() / S_base
+        )
+
+        # ------------------------------------------
+        # Compute NLSI per row
+        # ------------------------------------------
+        nlsi_values = []
+
+        for _, row in df_flow.iterrows():
+
+            i = int(row["from_bus"])
+            j = int(row["to_bus"])
+            t = int(row["time"])
+
+            P = row["P_pu"]
+            Q = row["Q_pu"]
+
+            # sending bus voltage
+            Vi = df_v[
+                (df_v["bus"] == i) &
+                (df_v["time"] == t)
+            ]["v_pu"].values[0]
+
+            # line parameters
+            R = data["r_pu"][(i, j)]
+            X = data["x_pu"][(i, j)]
+
+            # NLSI
+            nlsi = (
+                (R * P + X * Q)
+                / (0.25 * Vi**2)
+            )
+
+            nlsi_values.append({
+                "bus": j,
+                "time": t,
+                "nlsi": nlsi
+            })
+
+        df_nlsi = pd.DataFrame(nlsi_values)
+
+        # ------------------------------------------
+        # Aggregate per bus
+        # ------------------------------------------
+        summary = (
+            df_nlsi.groupby("bus")["nlsi"]
+            .agg(
+                nlsi_max="max",
+                nlsi_mean="mean",
+                nlsi_std="std"
+            )
+            .reset_index()
+        )
+
+        # ------------------------------------------
+        # Rank worst -> best
+        # ------------------------------------------
+        summary = summary.sort_values(
+            "nlsi_max",
+            ascending=False
+        ).reset_index(drop=True)
+
+        summary["rank"] = (
+            summary.index + 1
+        )
+
+        summary = summary[
+            [
+                "rank",
+                "bus",
+                "nlsi_max",
+                "nlsi_mean",
+                "nlsi_std"
+            ]
+        ]
+        summary.to_csv(
+            "data/bus_ranking_NLSI.csv",
+            index=False
+        )
+
+        if verbose:
+            print("\n==============================")
+            print("BUS NLSI RANKING (Worst → Best)")
+            print("==============================")
+
+            print(
+                summary.head(40)
+                .to_string(index=False)
+            )
+
+        return summary
 
 def build_PV(B, T, base_demand, profile, verbose=False):
     PV = {}
