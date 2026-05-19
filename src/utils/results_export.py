@@ -57,7 +57,7 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     export_line_flow_results(model, data, output_dir)
     export_voltage_results(model, data, output_dir)
     export_constraint_violations(model, data, output_dir)
-    if not NO_BATTERIES:
+    if AMOUNT_OF_BATTERIES > 0:
         export_battery_results(model, data, output_dir)
         export_soc_results(model, data, output_dir)
     if PV_SHARE != 0:
@@ -69,8 +69,9 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
 # ============================================================
 # CONFIG EXPORT
 # ============================================================
-def export_config_settings(data, output_dir):
 
+def export_config_settings(data, output_dir):
+    
     config_dict = {
 
         # -------------------------
@@ -81,7 +82,7 @@ def export_config_settings(data, output_dir):
         # -------------------------
         # Network
         # -------------------------
-        "NETWORK_CHOICE": "1-LV-semiurb4--0-sw",
+        "NETWORK_CHOICE": repr(NETWORK_CHOICE),
 
         # -------------------------
         # Simulation Horizon
@@ -100,6 +101,7 @@ def export_config_settings(data, output_dir):
         "BATTERY_EFFICIENCY": BATTERY_EFFICIENCY,
         "CP_EUR_PER_KW": CP,
         "CE_EUR_PER_KWH": CE,
+        "AMOUNT_OF_BATTERIES": AMOUNT_OF_BATTERIES,
 
         # -------------------------
         # Financial
@@ -130,6 +132,13 @@ def export_config_settings(data, output_dir):
         # PV
         # -------------------------
         "PV_SHARE": PV_SHARE,
+        "PV_SCENARIO": PV_SCENARIO,
+
+        # -------------------------
+        # Operational constraints
+        # -------------------------
+        "ALLOW_ENERGY_EXPORT": ALLOW_ENERGY_EXPORT,
+        "USE_GERMAN_PROFILES": USE_GERMAN_PROFILES,
 
         # -------------------------
         # Per-unit Base

@@ -2,9 +2,10 @@ import pandapower.networks as pn
 from simbench.networks import get_simbench_net
 
 
-VERSIONING_TITLE = "0_batteries_and_PV"
+VERSIONING_TITLE = "1bat_DE"
 
-NETWORK_CHOICE = get_simbench_net("1-LV-semiurb4--0-sw")
+NETWORK_CHOICE = get_simbench_net("1-LV-semiurb4--2-sw")
+# "1-LV-semiurb4--0-sw" "1-LV-semiurb4--1-sw" "1-LV-semiurb4--2-sw"
 TIME = 8760
 
 DATA_PATH_DEMAND = "data/Standaardprofielen elektriciteit 2026 versie 1.00.csv"
@@ -34,10 +35,15 @@ V_MAX = 1.05
 SOC_MIN = 0.2
 SOC_MAX = 0.8
 
-NO_BATTERIES = True
+AMOUNT_OF_BATTERIES = 1
 
-PV_SHARE = 0 #[0.0, 0.25, 0.50, 0.75, 1.0] #TODO: Run all these with a for-loop later.
-PV_SCENARIO = 'WEAKEST_BUS_SEVERITY_SCORE'
+ALLOW_ENERGY_EXPORT = False
+OPTIMALITY_GAP_SOLVER = 0.01
+
+USE_GERMAN_PROFILES = True
+
+PV_SHARE = 0.25 #[0.0, 0.25, 0.50, 0.75, 1.0] #TODO: Run all these with a for-loop later.
+PV_SCENARIO = 'LINE_STABILITY_INDEX'
                 # 'WEAKEST_BUS_SEVERITY_SCORE'
                 #'PV_EVERYWHERE'
                 # 'LINE_STABILITY_INDEX', 

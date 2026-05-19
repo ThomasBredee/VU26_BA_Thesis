@@ -5,6 +5,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque
+import simbench as sb
 
 
 def extract_network_data(net, verbose=False):
@@ -85,7 +86,6 @@ def extract_network_data(net, verbose=False):
     
     L_tree = [(parent_map[j], j) for j in parent_map]
 
-
     # ---------------------------
     # Check if edges create a Radial graph
     # ---------------------------
@@ -126,6 +126,8 @@ def extract_network_data(net, verbose=False):
     trafo = net.trafo.iloc[0]
     S_max_MVA = trafo.sn_mva
     Pmax_sub = S_max_MVA / S_base_MVA#* 1000  # MW → kW
+    print("SmaxMVA: ", S_max_MVA)
+    print("Pmax_sub: ", Pmax_sub)
 
     # -------------------------------------------------
     # Transformer apparent power limit
@@ -133,7 +135,7 @@ def extract_network_data(net, verbose=False):
     Pmax_line[(slack_bus, lv_root)] = trafo.sn_mva / S_base_MVA #* 1000   # kVA
 
     # ---------------------------
-    # Load per bus + yearly energy
+    # Load per bus + yearly energy (OLD, depracted!)
     # ---------------------------
     P_base_kw = (
         net.load[net.load.bus.isin(B)]
@@ -142,10 +144,88 @@ def extract_network_data(net, verbose=False):
         .reindex(B, fill_value=0)
         * 1000
     )
-
-    load_factor = 0.25 ################################################################TODO: this will be the basis for the model.
+    
+    load_factor = 0.25 ################TODO: this will be the basis for the model.
     E_year_pu = (P_base_kw/S_base_kVA) * load_factor * 8760
-    E_year_pu_dict = E_year_pu.to_dict()
+    E_year_pu_dict_old = E_year_pu.to_dict()
+
+
+
+    # -----------------------------------------
+    # Get SimBench load time series
+    # -----------------------------------------
+    profiles = sb.get_absolute_values(net, profiles_instead_of_study_cases=True)
+
+    # active load profiles (MW)
+    # rows = 15-min timesteps
+    # columns = individual load indices
+    load_profiles = profiles[("load", "p_mw")]
+    print(load_profiles)
+    dt = 0.25   # hours (15 min)
+
+    E_year_pu_dict = {}
+    for b in B:
+        # all load elements connected to this bus
+        load_ids = net.load[net.load.bus == b].index.tolist()
+
+        if len(load_ids) == 0:
+            E_year_pu_dict[b] = 0.0
+            continue
+
+        # sum all load profiles at this bus
+        bus_profile_MW = load_profiles[load_ids].sum(axis=1)
+
+        # integrate over year
+        energy_kWh = (bus_profile_MW.sum() * 1000 * dt)
+        energy_pu = (energy_kWh/ S_base_kVA)
+        E_year_pu_dict[b] = energy_pu
+
+    print(f"\n{'Bus':>5} {'Old [p.u.]':>15} {'New [p.u.]':>15}")
+    print("-" * 40)
+
+    for b in sorted(B):
+        print(
+            f"{b:>5} "
+            f"{E_year_pu_dict_old[b]:>15.6f} "
+            f"{E_year_pu_dict[b]:>15.6f}"
+        )
+
+        
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     # ---------------------------
@@ -166,6 +246,7 @@ def extract_network_data(net, verbose=False):
     # ---------------------------
     # Power factor ratio (q/p)
     # ---------------------------
+    P_base_kw = (net.load.groupby("bus")["p_mw"].sum() * 1000)
     qp_ratio = {}
 
     for b in B:

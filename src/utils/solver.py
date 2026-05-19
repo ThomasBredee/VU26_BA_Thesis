@@ -4,14 +4,14 @@ import numpy as np
 import math
 from pyomo.environ import value
 from pyomo.opt import TerminationCondition
-
+from config import OPTIMALITY_GAP_SOLVER
 
 def solve_model(model, tee=False):
     solver = SolverFactory("gurobi")
 
     # Optional solver settings
     # solver.options['TimeLimit'] = 600      # seconds
-    # solver.options['MIPGap'] = 0.005        # 0.5% optimality gap
+    solver.options['MIPGap'] = OPTIMALITY_GAP_SOLVER        # 0.5% optimality gap
 
     results = solver.solve(model, tee=tee)
 

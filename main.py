@@ -5,12 +5,14 @@ from config import (
     CE, CP, SOC_MIN, SOC_MAX,
     PV_SHARE,
     BATTERY_EFFICIENCY, ALPHA, C_DEG, V_MIN, V_MAX, 
-    VERSIONING_TITLE, PV_SCENARIO
+    VERSIONING_TITLE, PV_SCENARIO, USE_GERMAN_PROFILES
 )
 
 from src.input.extract_network import extract_network_data
 from src.input.load_data import load__demand_and_PV_profile_percentages, load_year_prices, convert_series_to_dict
 from src.input.preprocess_data import build_pD, build_qD, test_network, build_PV, generate_base_PV, build_S_inv, rank_buses_for_PV
+from src.input.german_profiles import *
+
 
 # from models.depracted_old_models.basic_model import build_model
 # from models.depracted_old_models.model_PV import build_model_PV
@@ -41,6 +43,48 @@ def main():
     # robustness_checker()
 
     data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
+    S_base = data["S_base_kVA"]
+    print(f"{'Bus':>5} {'Demand [kW]':>15}")
+
+    for bus, demand in sorted(
+        base_demand.items(),
+        key=lambda x: x[1],
+        reverse=True   # highest demand first
+    ):
+        demand_kw = demand * S_base   # p.u. → kW
+
+        print(
+            f"{bus:>5} "
+            f"{demand_kw:>15.2f}"
+        )
+
+
+    # Total network demand excluding buses 34–42
+    # ---------------------------
+
+    # excluded_buses = list(range(34, 43))   # 34,35,...,42
+    S_base = data["S_base_kVA"]
+
+    # sum all remaining buses (still in p.u.)
+    total_pu = sum(
+        demand
+        for bus, demand in base_demand.items()
+        # if bus not in excluded_buses
+    )
+
+    # convert p.u. → MW
+    total_mw = (total_pu * S_base) / 1000
+
+    print("\n========================================")
+    print("NETWORK DEMAND EXCLUDING BUSES 34–42")
+    print("========================================")
+    # print(f"Excluded buses     : {excluded_buses}")
+    print(f"Total demand [p.u.]: {total_pu:.6f}")
+    print(f"Total demand [MW]  : {total_mw:.4f}")
+
+
+
+
 
     # Create time array
     data['T'] = list(range(TIME))
@@ -48,15 +92,20 @@ def main():
     # Demand: load generate base demands, extract percentages, concat into noisy profiles
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
-    data['pD'] = build_pD(
-        B=data['B'],
-        T=data['T'],
-        base_demand=base_demand,
-        profile=demand_data_percentages,
-        verbose=False
-    )
+    if USE_GERMAN_PROFILES:
+        data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+        data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+    else:
 
-    data['qD'] = build_qD(qp_ratio, data['pD'])
+        data['pD'] = build_pD(
+            B=data['B'],
+            T=data['T'],
+            base_demand=base_demand,
+            profile=demand_data_percentages,
+            verbose=False
+        )
+
+        data['qD'] = build_qD(qp_ratio, data['pD'])
 
     data['eta'] = BATTERY_EFFICIENCY ** (0.5)
     data['alpha'] = ALPHA
@@ -85,17 +134,17 @@ def main():
     )
     data['S_inv'] =  build_S_inv(data['B'], data['T'], data['PV'])
 
-    # print("Building model constraints........")
-    # model = build_model_reactive(data)
+    print("Building model constraints........")
+    model = build_model_reactive(data)
 
-    # print("Solving model ....................")
-    # solved_model = solve_model(model, tee=True)
+    print("Solving model ....................")
+    solved_model = solve_model(model, tee=True)
 
-    # if solved_model:
-    #     # extract_results(model, results, data)
+    if solved_model:
+        # extract_results(model, results, data)
 
-    #     print("Exporting thesis results........")
-    #     export_thesis_results(model, data, versioning=VERSIONING_TITLE)
+        print("Exporting thesis results........")
+        export_thesis_results(model, data, versioning=VERSIONING_TITLE)
 
     print("Pipeline executed successfully.")
     

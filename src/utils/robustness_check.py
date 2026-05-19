@@ -7,7 +7,7 @@ def robustness_checker():
     # ============================================================
 
     # # Load csv
-    RESULTS_DIR = "results_0508_1504_0_batteries_and_PV"
+    RESULTS_DIR = "results_0519_1103_0_batteries_and_PV"
 
     # ============================================================
     # LINE LOADING

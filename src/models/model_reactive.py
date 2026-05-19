@@ -1,26 +1,26 @@
 from pyomo.environ import *
 from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
 import math
-from config import NO_BATTERIES
+from config import AMOUNT_OF_BATTERIES, ALLOW_ENERGY_EXPORT
 
 def build_model_reactive(data):
 
-    """
-    Build a Pyomo MILP model including an explicit substation bus.
+    # """
+    # Build a Pyomo MILP model including an explicit substation bus.
 
-    data: dict containing:
-        - B: list of distribution buses
-        - B_prime: list of substation buses (e.g., ['Substation'])
-        - L: list of lines as tuples (i,j)
-        - Pmax_line: dict {(i,j): capacity}
-        - Pmax_sub: maximum substation injection
-        - T: list of time intervals
-        - pD: dict {(i,t): demand}
-        - c: dict {t: price}
-        - cP, cE: battery costs for Power and Energy
-        - SOC_min, SOC_max: SOC limits
-        - MP, ME: Big-M parameters (can be precomputed)
-    """
+    # data: dict containing:
+    #     - B: list of distribution buses
+    #     - B_prime: list of substation buses (e.g., ['Substation'])
+    #     - L: list of lines as tuples (i,j)
+    #     - Pmax_line: dict {(i,j): capacity}
+    #     - Pmax_sub: maximum substation injection
+    #     - T: list of time intervals
+    #     - pD: dict {(i,t): demand}
+    #     - c: dict {t: price}
+    #     - cP, cE: battery costs for Power and Energy
+    #     - SOC_min, SOC_max: SOC limits
+    #     - MP, ME: Big-M parameters (can be precomputed)
+    # """
 
 
     model = ConcreteModel()
@@ -71,8 +71,15 @@ def build_model_reactive(data):
     # Variables
     # -------------------------
     model.P = Var(model.L, model.T, domain=Reals)               # Active power flow on lines (i -> j, parent-to-child convention)
-    model.P_sub = Var(model.B_sub, model.T, domain=Reals)     # Substation power (now allows export as well → Reals, NOT NonNegative)
-
+    
+    if ALLOW_ENERGY_EXPORT:
+        model.P_sub = Var(model.B_sub, model.T, domain=Reals)     # Substation power (now allows export as well → Reals, NOT NonNegative)
+        model.Q_sub = Var(model.B_sub, model.T, domain=Reals)     # Reactive power at substation (grid exchange)
+    else:
+        model.P_sub = Var(model.B_sub, model.T, domain=NonNegativeReals)     # Substation power (now allows export as well → Reals, NOT NonNegative)
+        model.Q_sub = Var(model.B_sub, model.T, domain=NonNegativeReals)     # Reactive power at substation (grid exchange)
+    
+    
     model.b = Var(model.B, domain=Binary)                       # install battery or not
     model.Pmax = Var(model.B, domain=NonNegativeReals)          # battery power rating (kW or p.u.)
     model.Emax = Var(model.B, domain=NonNegativeReals)          # battery energy capacity (kWh or p.u.)
@@ -86,7 +93,7 @@ def build_model_reactive(data):
 
     model.Q = Var(model.L, model.T, domain=Reals)               # Reactive power flow on lines (parent -> child)
     model.v = Var(model.B0, model.T, domain=NonNegativeReals)   # Squared voltage magnitude (p.u.^2)
-    model.Q_sub = Var(model.B_sub, model.T, domain=Reals)     # Reactive power at substation (grid exchange)
+    
     model.qPV = Var(model.B, model.T, domain=Reals)             # PV reactive power injection (can be positive or negative)
 
     # -------------------------
@@ -128,11 +135,10 @@ def build_model_reactive(data):
     #         return m.b[i] == 0
     # model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
 
-    # #OR this battery rule:
-    if NO_BATTERIES:
-        def battery_budget_rule(m):
-            return sum(m.b[i] for i in m.B) <= 0
-        model.BatteryBudget = Constraint(rule=battery_budget_rule)
+    # battery rule:
+    def battery_budget_rule(m):
+        return sum(m.b[i] for i in m.B) <= AMOUNT_OF_BATTERIES
+    model.BatteryBudget = Constraint(rule=battery_budget_rule)
         
 
 
