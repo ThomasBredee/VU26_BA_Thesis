@@ -39,7 +39,7 @@ from config import *
 # MAIN PIPELINE
 # ============================================================
 
-def export_thesis_results(model, data, versioning, results_dir="results"):
+def export_thesis_results(model, data, pv_share, versioning, results_dir="results"):
 
     timestamp = datetime.now().strftime("%m%d_%H%M")
 
@@ -60,7 +60,7 @@ def export_thesis_results(model, data, versioning, results_dir="results"):
     if AMOUNT_OF_BATTERIES > 0:
         export_battery_results(model, data, output_dir)
         export_soc_results(model, data, output_dir)
-    if PV_SHARE != 0:
+    if pv_share != 0:
         export_pv_results(model, data, output_dir)
 
     print(f"\nResults exported to: {output_dir}")
@@ -82,7 +82,8 @@ def export_config_settings(data, output_dir):
         # -------------------------
         # Network
         # -------------------------
-        "NETWORK_CHOICE": repr(NETWORK_CHOICE),
+        "NETWORK_CHOICE": NETWORK_CHOICE,
+        "NETWORK_CHOICE_ELABORATE": repr(NETWORK_CHOICE),
 
         # -------------------------
         # Simulation Horizon
@@ -101,7 +102,6 @@ def export_config_settings(data, output_dir):
         "BATTERY_EFFICIENCY": BATTERY_EFFICIENCY,
         "CP_EUR_PER_KW": CP,
         "CE_EUR_PER_KWH": CE,
-        "AMOUNT_OF_BATTERIES": AMOUNT_OF_BATTERIES,
 
         # -------------------------
         # Financial
@@ -127,23 +127,27 @@ def export_config_settings(data, output_dir):
         # -------------------------
         "SOC_MIN": SOC_MIN,
         "SOC_MAX": SOC_MAX,
+        
+        # -------------------------
+        # Per-unit Base
+        # -------------------------
+        "S_BASE_KVA": data["S_base_kVA"],
 
+
+        "NETWORK_CHOICE": NETWORK_CHOICE,
         # -------------------------
         # PV
         # -------------------------
         "PV_SHARE": PV_SHARE,
         "PV_SCENARIO": PV_SCENARIO,
+        "PV_REACTIVE_MODE": PV_REACTIVE_MODE, 
 
         # -------------------------
         # Operational constraints
         # -------------------------
         "ALLOW_ENERGY_EXPORT": ALLOW_ENERGY_EXPORT,
         "USE_GERMAN_PROFILES": USE_GERMAN_PROFILES,
-
-        # -------------------------
-        # Per-unit Base
-        # -------------------------
-        "S_BASE_KVA": data["S_base_kVA"]
+        "AMOUNT_OF_BATTERIES": AMOUNT_OF_BATTERIES
     }
 
     df = pd.DataFrame(

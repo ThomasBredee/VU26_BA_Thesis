@@ -41,7 +41,7 @@ def NLSI_calculation(net):
     # Sort highest first
     ranking = net.line.sort_values("NLSI", ascending=False)
 
-    print(ranking[["from_bus", "to_bus", "NLSI"]])
+    # print(ranking[["from_bus", "to_bus", "NLSI"]])
 
 def test_network(net):
     pp.runpp(net)

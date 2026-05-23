@@ -1,7 +1,7 @@
 from pyomo.environ import *
 from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeReals, Reals, Objective, Constraint, minimize, value, quicksum
 import math
-from config import AMOUNT_OF_BATTERIES, ALLOW_ENERGY_EXPORT
+from config import AMOUNT_OF_BATTERIES, ALLOW_ENERGY_EXPORT, PV_REACTIVE_MODE
 
 def build_model_reactive(data):
 
@@ -241,14 +241,20 @@ def build_model_reactive(data):
     model.PVSplit = Constraint(model.B, model.T, rule=pv_split_rule)
     
     # PV inverter apparent power constraint (polygon)
-    def pv_inverter_limit_rule(m, i, t, k):
-        theta = m.theta[k]
-        return (
-            m.pPV_used[i, t] * math.cos(theta) +
-            m.qPV[i, t] * math.sin(theta)
-            <= m.S_inv[i]
-        )
-    model.PVInverterLimits = Constraint(model.B, model.T, model.K, rule=pv_inverter_limit_rule)
+    if PV_REACTIVE_MODE == "reactive_support":
+        def pv_inverter_limit_rule(m, i, t, k):
+            theta = m.theta[k]
+            return (
+                m.pPV_used[i, t] * math.cos(theta) +
+                m.qPV[i, t] * math.sin(theta)
+                <= m.S_inv[i]
+            )
+        model.PVInverterLimits = Constraint(model.B, model.T, model.K, rule=pv_inverter_limit_rule)
+    
+    elif PV_REACTIVE_MODE == "unity_pf":
+        def unity_pf_rule(m, i, t):
+            return m.qPV[i, t] == 0
+        model.UnityPF = Constraint(model.B, model.T, rule=unity_pf_rule)
 
 
     # SOC dynamics (correct efficiency form)

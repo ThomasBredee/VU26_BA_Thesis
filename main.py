@@ -43,44 +43,44 @@ def main():
     # robustness_checker()
 
     data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
-    S_base = data["S_base_kVA"]
-    print(f"{'Bus':>5} {'Demand [kW]':>15}")
+    # S_base = data["S_base_kVA"]
+    # print(f"{'Bus':>5} {'Demand [kW]':>15}")
 
-    for bus, demand in sorted(
-        base_demand.items(),
-        key=lambda x: x[1],
-        reverse=True   # highest demand first
-    ):
-        demand_kw = demand * S_base   # p.u. → kW
+    # for bus, demand in sorted(
+    #     base_demand.items(),
+    #     key=lambda x: x[1],
+    #     reverse=True   # highest demand first
+    # ):
+    #     demand_kw = demand * S_base   # p.u. → kW
 
-        print(
-            f"{bus:>5} "
-            f"{demand_kw:>15.2f}"
-        )
+    #     print(
+    #         f"{bus:>5} "
+    #         f"{demand_kw:>15.2f}"
+    #     )
 
 
     # Total network demand excluding buses 34–42
     # ---------------------------
 
-    # excluded_buses = list(range(34, 43))   # 34,35,...,42
-    S_base = data["S_base_kVA"]
+    # # excluded_buses = list(range(34, 43))   # 34,35,...,42
+    # S_base = data["S_base_kVA"]
 
-    # sum all remaining buses (still in p.u.)
-    total_pu = sum(
-        demand
-        for bus, demand in base_demand.items()
-        # if bus not in excluded_buses
-    )
+    # # sum all remaining buses (still in p.u.)
+    # total_pu = sum(
+    #     demand
+    #     for bus, demand in base_demand.items()
+    #     # if bus not in excluded_buses
+    # )
 
-    # convert p.u. → MW
-    total_mw = (total_pu * S_base) / 1000
+    # # convert p.u. → MW
+    # total_mw = (total_pu * S_base) / 1000
 
-    print("\n========================================")
-    print("NETWORK DEMAND EXCLUDING BUSES 34–42")
-    print("========================================")
-    # print(f"Excluded buses     : {excluded_buses}")
-    print(f"Total demand [p.u.]: {total_pu:.6f}")
-    print(f"Total demand [MW]  : {total_mw:.4f}")
+    # print("\n========================================")
+    # print("NETWORK DEMAND EXCLUDING BUSES 34–42")
+    # print("========================================")
+    # # print(f"Excluded buses     : {excluded_buses}")
+    # print(f"Total demand [p.u.]: {total_pu:.6f}")
+    # print(f"Total demand [MW]  : {total_mw:.4f}")
 
 
 
@@ -96,7 +96,6 @@ def main():
         data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
         data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
     else:
-
         data['pD'] = build_pD(
             B=data['B'],
             T=data['T'],
@@ -104,8 +103,8 @@ def main():
             profile=demand_data_percentages,
             verbose=False
         )
-
         data['qD'] = build_qD(qp_ratio, data['pD'])
+
 
     data['eta'] = BATTERY_EFFICIENCY ** (0.5)
     data['alpha'] = ALPHA
@@ -124,29 +123,46 @@ def main():
 
 
     # bus_ranking = rank_buses_for_PV(PV_SCENARIO, data, verbose = True)
-    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, PV_SCENARIO)
-    data['PV'] = build_PV(
-        B=data['B'],
-        T=data['T'],
-        base_demand=base_PV,
-        profile=PV_data_percentages,
-        verbose=False
-    )
-    data['S_inv'] =  build_S_inv(data['B'], data['T'], data['PV'])
+    for pv_share in PV_SHARE:
 
-    print("Building model constraints........")
-    model = build_model_reactive(data)
+        print("\n======================================")
+        print(f"Running PV scenario: {pv_share:.2f}")
+        print("======================================")
 
-    print("Solving model ....................")
-    solved_model = solve_model(model, tee=True)
+        # -----------------------------------
+        # Build PV for this scenario
+        # -----------------------------------
+        base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
 
-    if solved_model:
-        # extract_results(model, results, data)
+        data['PV'] = build_PV(
+            B=data['B'],
+            T=data['T'],
+            base_demand=base_PV,
+            profile=PV_data_percentages,
+            verbose=False
+        )
 
-        print("Exporting thesis results........")
-        export_thesis_results(model, data, versioning=VERSIONING_TITLE)
+        data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
 
-    print("Pipeline executed successfully.")
+        print("Building model constraints........")
+        model = build_model_reactive(data)
+
+        print("Solving model ....................")
+        solved_model = solve_model(model, tee=True)
+
+        if solved_model:
+            print("Exporting thesis results........")
+
+            export_thesis_results(
+                model,
+                data,
+                pv_share,
+                versioning=f"{VERSIONING_TITLE}_PV{pv_share:.2f}"
+            )
+
+            print(f"Finished PV scenario {pv_share:.2f}")
+
+    print("\nPipeline executed successfully.")
     
      
 if __name__ == "__main__":
