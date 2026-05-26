@@ -5,24 +5,6 @@ from config import AMOUNT_OF_BATTERIES, ALLOW_ENERGY_EXPORT, PV_REACTIVE_MODE
 
 def build_model_reactive(data):
 
-    # """
-    # Build a Pyomo MILP model including an explicit substation bus.
-
-    # data: dict containing:
-    #     - B: list of distribution buses
-    #     - B_prime: list of substation buses (e.g., ['Substation'])
-    #     - L: list of lines as tuples (i,j)
-    #     - Pmax_line: dict {(i,j): capacity}
-    #     - Pmax_sub: maximum substation injection
-    #     - T: list of time intervals
-    #     - pD: dict {(i,t): demand}
-    #     - c: dict {t: price}
-    #     - cP, cE: battery costs for Power and Energy
-    #     - SOC_min, SOC_max: SOC limits
-    #     - MP, ME: Big-M parameters (can be precomputed)
-    # """
-
-
     model = ConcreteModel()
 
     # -------------------------
@@ -93,11 +75,11 @@ def build_model_reactive(data):
 
     model.Q = Var(model.L, model.T, domain=Reals)               # Reactive power flow on lines (parent -> child)
     model.v = Var(model.B0, model.T, domain=NonNegativeReals)   # Squared voltage magnitude (p.u.^2)
-    
+
     model.qPV = Var(model.B, model.T, domain=Reals)             # PV reactive power injection (can be positive or negative)
 
     # -------------------------
-    # Objective (LinDistFlow-consistent)
+    # Objective
     # -------------------------
     def obj_rule(m):
         energy_cost = sum(
@@ -126,23 +108,7 @@ def build_model_reactive(data):
     # Constraints
     # -------------------------
 
-    # NOTE: THESE 2 CONSTRAINTS ARE JUST KEPT HERE FOR QUICK DEBUGGING RUNS..................
-    # # Fixing batteries of the model OR force battery placement somewhere:
-    # def fixing_batteries(m,i ):
-    #     if i in [17, 32]:
-    #         return m.b[i] == 1
-    #     else:
-    #         return m.b[i] == 0
-    # model.LinearRelaxation = Constraint(model.B, rule = fixing_batteries)
-
-    # battery rule:
-    def battery_budget_rule(m):
-        return sum(m.b[i] for i in m.B) <= AMOUNT_OF_BATTERIES
-    model.BatteryBudget = Constraint(rule=battery_budget_rule)
-        
-
-
-    # # Active power balance rule for all buses.
+    # Active power balance rule for all buses.
     def active_balance_rule(m, j, t):
         parent = data['parent_map'].get(j, None)
         children = data['children_map'].get(j, [])
@@ -183,8 +149,6 @@ def build_model_reactive(data):
     model.SubstationQ = Constraint(model.T, rule=substation_balance_Q)
 
 
-
-
     # Voltage drop (LinDistFlow)
     def voltage_drop_rule(m, i, j, t):
         return m.v[j, t] == m.v[i, t] - 2 * (
@@ -223,18 +187,6 @@ def build_model_reactive(data):
         )
     model.LineLimits = Constraint(model.L, model.T, model.K, rule=line_limit_rule)
 
-    ########  THIS FUNCTION IS DROPPED BECAUSE LINE 129 -> 14 IS ADDED #################
-    # # Substation apparent power limit
-    # def substation_limit_rule(m, t, k):
-    #     theta = m.theta[k]
-    #     return (
-    #         m.P_sub[t] * math.cos(theta) +
-    #         m.Q_sub[t] * math.sin(theta)
-    #         <= m.S_trafo
-    #     )
-    # model.SubstationLimits = Constraint(model.T, model.K, rule=substation_limit_rule)
-
-
     #PV linking:
     def pv_split_rule(m, i, t):
         return m.pPV_used[i, t] + m.pPV_curt[i, t] == m.PV[i, t]
@@ -256,6 +208,10 @@ def build_model_reactive(data):
             return m.qPV[i, t] == 0
         model.UnityPF = Constraint(model.B, model.T, rule=unity_pf_rule)
 
+    # Battery rule
+    def battery_budget_rule(m):
+        return sum(m.b[i] for i in m.B) <= AMOUNT_OF_BATTERIES
+    model.BatteryBudget = Constraint(rule=battery_budget_rule)
 
     # SOC dynamics (correct efficiency form)
     def soc_rule(m, i, t):
@@ -301,17 +257,14 @@ def build_model_reactive(data):
         return m.pCHA[i, t] <= m.Pmax[i]
     model.ChargeUpper = Constraint(model.B, model.T, rule=charge_upper_rule)
 
-
+    # Couple power to energy for batteries
     def power_energy_coupling_rule(m, i):
         return m.Pmax[i] == m.Emax[i] / 4
     model.PowerEnergyCoupling = Constraint(model.B, rule=power_energy_coupling_rule)
 
- 
-
+    # Define big M ruling
     def bigM_energy_rule(m, i):
         return m.Emax[i] <= m.E_CAP * m.b[i]
     model.BigM_Energy = Constraint(model.B, rule=bigM_energy_rule)
-    
-        
 
     return model

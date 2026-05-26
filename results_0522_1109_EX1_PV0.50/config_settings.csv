@@ -1,0 +1,42 @@
+parameter,value
+VERSIONING_TITLE,EX1
+NETWORK_CHOICE,"This pandapower network includes the following parameter tables:
+   - bus (44 elements)
+   - load (41 elements)
+   - sgen (1 element)
+   - switch (86 elements)
+   - ext_grid (1 element)
+   - line (42 elements)
+   - trafo (1 element)
+   - loadcases (6 elements)"
+NETWORK_CHOICE_ELABORATE,"This pandapower network includes the following parameter tables:
+   - bus (44 elements)
+   - load (41 elements)
+   - sgen (1 element)
+   - switch (86 elements)
+   - ext_grid (1 element)
+   - line (42 elements)
+   - trafo (1 element)
+   - loadcases (6 elements)"
+TIME_HOURS,8760
+DATA_PATH_DEMAND,data/Standaardprofielen elektriciteit 2026 versie 1.00.csv
+DATA_PATH_ELECTRICITY_PRICE,data/Netherlands hourly electricity price.csv
+BATTERY_EFFICIENCY,0.95
+CP_EUR_PER_KW,360
+CE_EUR_PER_KWH,210
+DISCOUNT_RATE,0.05
+BATTERY_LIFETIME_YEARS,10
+ALPHA,0.12950457496545661
+BATTERY_CYCLES,5000
+C_DEG_EUR_PER_KWH,0.021
+V_MIN_PU,0.95
+V_MAX_PU,1.05
+SOC_MIN,0.2
+SOC_MAX,0.8
+S_BASE_KVA,1000.0
+PV_SHARE,"[0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0]"
+PV_SCENARIO,PV_EVERYWHERE
+PV_REACTIVE_MODE,unity_pf
+ALLOW_ENERGY_EXPORT,False
+USE_GERMAN_PROFILES,False
+AMOUNT_OF_BATTERIES,0
