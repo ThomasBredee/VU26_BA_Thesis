@@ -486,6 +486,12 @@ def extract_network_data(net, verbose=False):
 
     children_map[129].append(14)
 
+    # print("\n=== Annual Energy per Bus (p.u.) ===\n")
+    # print(f"{'Bus':>6} | {'Energy [p.u.]':>15}")
+    # print("-" * 26)
+
+    # for bus, val in sorted(E_year_pu_dict.items(), key=lambda x: x[1], reverse=True):
+    #     print(f"{bus:>6} | {val:>15.6f}")
 
     return {
         "B": B,

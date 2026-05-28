@@ -37,12 +37,12 @@ def load__demand_and_PV_profile_percentages(filepath, verbose_demand=False, verb
     resampled_profile_PV = resampled_profile_PV / resampled_profile_PV.sum()
 
     if verbose_demand:
-        plot_daily_average(resampled_profile)
-        plot_hourly_pattern(resampled_profile)
+        plot_daily_average(resampled_profile, 'Demand')
+        plot_hourly_pattern(resampled_profile, 'Demand')
 
     if verbose_PV:
-        plot_daily_average(resampled_profile_PV)
-        plot_hourly_pattern(resampled_profile_PV)
+        plot_daily_average(resampled_profile_PV, 'PV')
+        plot_hourly_pattern(resampled_profile_PV, 'PV')
 
 
     return resampled_profile, resampled_profile_PV.values.flatten()
@@ -96,6 +96,79 @@ def convert_series_to_dict(series, T):
     values = series.values.flatten()
     return {t: values[t] for t in T}
 
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def aggregate_to_typical_week(prices_df, start_month, end_month):
+    """
+    Aggregate multiple months into a single 'typical week'
+    by averaging all values for each hour-of-week pattern.
+
+    Parameters
+    ----------
+    prices_df : pd.DataFrame
+        DatetimeIndex + 'Price'
+    start_month : int
+        Start month (e.g. 1 for January)
+    end_month : int
+        End month (e.g. 3 for March)
+
+    Returns
+    -------
+    pd.Series
+        Typical week (168 values)
+    """
+
+    df = prices_df.copy()
+
+    # Filter months
+    df = df[(df.index.month >= start_month) & (df.index.month <= end_month)]
+
+    # Build week structure
+    df["day_of_week"] = df.index.dayofweek
+    df["hour"] = df.index.hour
+
+    # Aggregate into typical week
+    weekly = (
+        df.groupby(["day_of_week", "hour"])["Price"]
+        .mean()
+        .unstack()
+        .sort_index()
+    )
+
+    # Flatten into 168-hour vector (7 * 24)
+    typical_week = weekly.values.flatten()
+
+    return pd.Series(typical_week)
+
+
+
+def plot_typical_summer_winter(prices_df):
+    """
+    Compare seasonal representative weeks:
+    winter (Jan–Mar) vs summer (Jul–Sep)
+    """
+
+    winter_week = aggregate_to_typical_week(prices_df, 1, 3)
+    summer_week = aggregate_to_typical_week(prices_df, 7, 9)
+
+    x = range(168)
+
+    plt.figure(figsize=(14, 5))
+
+    plt.plot(x, winter_week, label="Winter (Jan–Mar)", linewidth=2)
+    plt.plot(x, summer_week, label="Summer (Jul–Sep)", linewidth=2)
+
+    plt.title("Typical Weekly Electricity Prices (Seasonal Aggregation)")
+    plt.xlabel("Hour of Week (Monday–Sunday)")
+    plt.ylabel("Price [EUR/kWh]")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col='Price (EUR/MWhe)', verbose=False):
     """
     Load hourly electricity prices from CSV and return only data for a specified year.
@@ -141,7 +214,8 @@ def load_year_prices(filepath, year, datetime_col='Datetime (Local)', price_col=
     
     if verbose:
         plot_first_hours_prices(df)
-        plot_price_boxplot(df)
+        # plot_price_boxplot(df)
+        plot_typical_summer_winter(df)
 
     return df
 

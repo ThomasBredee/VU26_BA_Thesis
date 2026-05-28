@@ -106,93 +106,200 @@ def generate_base_PV(B, base_demand, pv_penetration, scenario):
             base_PV[b] = pv_penetration * demand
     
     if scenario == "WEAKEST_BUS_SEVERITY_SCORE":
+
+        # ==========================================
         # Initialize all buses with zero PV
+        # ==========================================
         for b in B:
             base_PV[b] = 0.0
 
-        # ------------------------------------------
+        # ==========================================
         # Total PV budget
-        # ------------------------------------------
-        total_demand = sum(base_demand.values())
-
-        total_pv_budget = pv_penetration * total_demand
-
-        # ------------------------------------------
-        # Top 10 weakest buses
-        # ------------------------------------------
-        bus_ranking = pd.read_csv("data/bus_ranking_bus_voltage.csv")
-        top10 = bus_ranking.head(10).copy()
-
-        # columns expected:
-        # rank | bus | severity_score
-
-        # ------------------------------------------
-        # Normalize severity scores
-        # ------------------------------------------
-        total_severity = top10["severity_score"].sum()
-
-        top10["weight"] = (
-            top10["severity_score"] / total_severity
-        )
-
-        # ------------------------------------------
-        # Allocate PV
-        # ------------------------------------------
-        for _, row in top10.iterrows():
-
-            bus = int(row["bus"])
-            weight = row["weight"]
-
-            base_PV[bus] = (
-                weight * total_pv_budget
-            )
-
-    if scenario == "LINE_STABILITY_INDEX":
-
-        # Initialize all buses with zero PV
-        for b in B:
-            base_PV[b] = 0.0
-
-        # ------------------------------------------
-        # Total PV budget
-        # ------------------------------------------
+        # ==========================================
         total_demand = sum(base_demand.values())
 
         total_pv_budget = (
             pv_penetration * total_demand
         )
 
-        # ------------------------------------------
-        # Top 10 weakest buses
-        # (highest NLSI)
-        # ------------------------------------------
-        bus_ranking = pd.read_csv("data/bus_ranking_NLSI.csv")
-        top10 = bus_ranking.head(10).copy()
+        # ==========================================
+        # Top-N weakest buses
+        # ==========================================
+        topN = 15
+
+        bus_ranking = pd.read_csv(
+            "data/bus_ranking_bus_voltage.csv"
+        )
+
+        top = bus_ranking.head(topN).copy()
+
+        # expected columns:
+        # rank | bus | severity_score
+
+        # ==========================================
+        # Add local demand
+        # ==========================================
+        top["demand"] = (
+            top["bus"]
+            .map(base_demand)
+            .fillna(0)
+        )
+
+        # ==========================================
+        # Hybrid weighting parameters
+        # ==========================================
+        alpha = 0.7   # electrical severity importance
+        beta  = 0.3   # demand importance
+
+        # ==========================================
+        # Hybrid score
+        # ==========================================
+        top["hybrid_score"] = (
+            np.log1p(top["severity_score"]) ** alpha
+            *
+            np.power(top["demand"], beta)
+        )
+
+        # ==========================================
+        # Normalize weights
+        # ==========================================
+        total_score = top["hybrid_score"].sum()
+
+        top["weight"] = (
+            top["hybrid_score"]
+            / total_score
+        )
+
+        # ==========================================
+        # Allocate PV
+        # ==========================================
+        for _, row in top.iterrows():
+
+            bus = int(row["bus"])
+
+            base_PV[bus] = (
+                row["weight"]
+                * total_pv_budget
+            )
+
+        # ==========================================
+        # Optional diagnostics
+        # ==========================================
+        # print("\n======================================")
+        # print("PV ALLOCATION (Voltage Severity)")
+        # print("======================================")
+
+        # print(
+        #     top[
+        #         [
+        #             "rank",
+        #             "bus",
+        #             "severity_score",
+        #             "demand",
+        #             "hybrid_score",
+        #             "weight"
+        #         ]
+        #     ].to_string(index=False)
+        # )
+
+
+    if scenario == "LINE_STABILITY_INDEX":
+
+        # ==========================================
+        # Initialize all buses with zero PV
+        # ==========================================
+        for b in B:
+            base_PV[b] = 0.0
+
+        # ==========================================
+        # Total PV budget
+        # ==========================================
+        total_demand = sum(base_demand.values())
+
+        total_pv_budget = (
+            pv_penetration * total_demand
+        )
+
+        # ==========================================
+        # Top-N buses with highest NLSI
+        # ==========================================
+        topN = 15
+
+        bus_ranking = pd.read_csv(
+            "data/bus_ranking_NLSI.csv"
+        )
+
+        top = bus_ranking.head(topN).copy()
 
         # expected columns:
         # rank | bus | nlsi_max
 
-        # ------------------------------------------
-        # Normalize NLSI scores
-        # ------------------------------------------
-        total_nlsi = top10["nlsi_max"].sum()
-
-        top10["weight"] = (
-            top10["nlsi_max"] / total_nlsi
+        # ==========================================
+        # Add local demand
+        # ==========================================
+        top["demand"] = (
+            top["bus"]
+            .map(base_demand)
+            .fillna(0)
         )
 
-        # ------------------------------------------
-        # Allocate PV proportionally
-        # ------------------------------------------
-        for _, row in top10.iterrows():
+        # ==========================================
+        # Hybrid weighting parameters
+        # ==========================================
+        alpha = 0.7
+        beta  = 0.3
+
+        # ==========================================
+        # Hybrid score
+        # ==========================================
+        top["hybrid_score"] = (
+            np.log1p(top["nlsi_max"]) ** alpha
+            *
+            np.power(top["demand"], beta)
+        )
+
+        # ==========================================
+        # Normalize weights
+        # ==========================================
+        total_score = top["hybrid_score"].sum()
+
+        top["weight"] = (
+            top["hybrid_score"]
+            / total_score
+        )
+
+        # ==========================================
+        # Allocate PV
+        # ==========================================
+        for _, row in top.iterrows():
 
             bus = int(row["bus"])
-            weight = row["weight"]
 
             base_PV[bus] = (
-                weight * total_pv_budget
+                row["weight"]
+                * total_pv_budget
             )
-    
+
+        # ==========================================
+        # Optional diagnostics
+        # ==========================================
+        # print("\n======================================")
+        # print("PV ALLOCATION (NLSI)")
+        # print("======================================")
+
+        # print(
+        #     top[
+        #         [
+        #             "rank",
+        #             "bus",
+        #             "nlsi_max",
+        #             "demand",
+        #             "hybrid_score",
+        #             "weight"
+        #         ]
+        #     ].to_string(index=False)
+        # )
+
     return base_PV
 
 def normalize_profile(profile):
@@ -530,16 +637,18 @@ def plot_bus_profiles_window(pD, B, T, n_buses=3, start=0, horizon=300):
     Plot a smaller time window (default: 1 week = 168 hours)
     """
 
-    T_window = T[start:start + horizon]
+    T_window = range(3000,3300) #T[start:start + horizon]
 
-    for bus in B[2:2+n_buses]:
+    bus_choice = [B[6], B[7], B[22]]
+
+    for bus in bus_choice:#B[2:2+n_buses]:
         values = [pD[(bus, t)] for t in T_window]
         plt.plot(T_window, values, label=f'Bus {bus}')
 
     plt.legend()
     plt.xlabel("Time (hours)")
     plt.ylabel("Demand")
-    plt.title(f"Bus Demand Profiles (t={start} to {start+horizon})")
+    plt.title(f"Bus Demand Profiles - AR(1) shifted")
     plt.show()
 
 

@@ -18,7 +18,7 @@ def plot_noise_comparison(original, noisy, n=200):
     plt.show()
 
 
-def plot_daily_average(profile):
+def plot_daily_average(profile, naming):
     """
     Plot daily average over the year
     """
@@ -27,14 +27,16 @@ def plot_daily_average(profile):
     plt.figure(figsize=(10, 5))
     plt.plot(daily.index, daily.iloc[:, 0])
 
-    plt.title("Daily Average Electricity Profile")
+    name = "Annual Average Dutch Electricity Profile for " + naming
+
+    plt.title(name)
     plt.xlabel("Date")
     plt.ylabel("Value")
 
     plt.show()
 
 
-def plot_hourly_pattern(profile):
+def plot_hourly_pattern(profile, naming):
     """
     Plot average load per hour of the day
     """
@@ -46,7 +48,9 @@ def plot_hourly_pattern(profile):
     plt.figure(figsize=(10, 5))
     plt.plot(hourly_pattern.index, hourly_pattern.iloc[:, 0])
 
-    plt.title("Average Daily Load Pattern")
+    name = "Average Daily Load Pattern for " + naming
+
+    plt.title(name)
     plt.xlabel("Hour of Day")
     plt.ylabel("Value")
 

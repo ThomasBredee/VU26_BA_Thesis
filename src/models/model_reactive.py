@@ -3,7 +3,7 @@ from pyomo.environ import ConcreteModel, Set, Param, Var, Binary, NonNegativeRea
 import math
 from config import AMOUNT_OF_BATTERIES, ALLOW_ENERGY_EXPORT, PV_REACTIVE_MODE
 
-def build_model_reactive(data):
+def build_model_reactive(data, num_batteries = AMOUNT_OF_BATTERIES):
 
     model = ConcreteModel()
 
@@ -209,8 +209,12 @@ def build_model_reactive(data):
         model.UnityPF = Constraint(model.B, model.T, rule=unity_pf_rule)
 
     # Battery rule
-    def battery_budget_rule(m):
-        return sum(m.b[i] for i in m.B) <= AMOUNT_OF_BATTERIES
+    if isinstance(AMOUNT_OF_BATTERIES, list):
+        def battery_budget_rule(m):
+            return sum(m.b[i] for i in m.B) == num_batteries
+    else:
+        def battery_budget_rule(m):
+            return sum(m.b[i] for i in m.B) <= num_batteries
     model.BatteryBudget = Constraint(rule=battery_budget_rule)
 
     # SOC dynamics (correct efficiency form)

@@ -39,7 +39,7 @@ from config import *
 # MAIN PIPELINE
 # ============================================================
 
-def export_thesis_results(model, data, pv_share, versioning, results_dir="results"):
+def export_thesis_results(model, data, amount_of_batteries, pv_share, versioning, results_dir="results"):
 
     timestamp = datetime.now().strftime("%m%d_%H%M")
 
@@ -57,7 +57,7 @@ def export_thesis_results(model, data, pv_share, versioning, results_dir="result
     export_line_flow_results(model, data, output_dir)
     export_voltage_results(model, data, output_dir)
     export_constraint_violations(model, data, output_dir)
-    if AMOUNT_OF_BATTERIES > 0:
+    if amount_of_batteries > 0:
         export_battery_results(model, data, output_dir)
         export_soc_results(model, data, output_dir)
     if pv_share != 0:
