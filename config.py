@@ -34,22 +34,26 @@ V_MAX = 1.05
 SOC_MIN = 0.1
 SOC_MAX = 0.9
 
-AMOUNT_OF_BATTERIES = [0,1,2,3,4,5,6,7,8,9,10]
+AMOUNT_OF_BATTERIES = [2]
 
 ALLOW_ENERGY_EXPORT = False
 OPTIMALITY_GAP_SOLVER = 0.0
 
 USE_GERMAN_PROFILES = False
 
-PV_SHARE = 1.0#[0.0, 0.25, 0.50, 0.75, 1.0, 1.5, 2.0]
-PV_SCENARIO = 'PV_EVERYWHERE'
-                # 'WEAKEST_BUS_SEVERITY_SCORE'
-                #'PV_EVERYWHERE'
-                # 'LINE_STABILITY_INDEX', 
 
-PV_REACTIVE_MODE = "unity_pf"     # options: "unity_pf", "reactive_support"
+ELECTRIFICATION_FACTOR = [1.1, 1.2, 1.3, 1.4, 1.5] #, 1.6, 1.7, 1.8, 1.9, 2.0]
 
-VERSIONING_TITLE = "RQ1"
+PV_SHARE = [1.1, 1.2, 1.3, 1.4, 1.5]   #, 1.6, 1.7, 1.8, 1.9, 2.0] #1.5# [0.0,  0.50,  1.0, 1.5, 2.0] #0.25, 0.75,
+PV_SCENARIO = ["WEAKEST_BUS_SEVERITY_SCORE", "LINE_STABILITY_INDEX"]               #['WEAKEST_BUS_SEVERITY_SCORE','LINE_STABILITY_INDEX', 'PV_EVERYWHERE']
+                                            # 'WEAKEST_BUS_SEVERITY_SCORE'
+                                            #'PV_EVERYWHERE'
+                                            # 'LINE_STABILITY_INDEX', 
 
-DESCRIPTION = "This run tests placing [0 - 10] batteries."
+PV_REACTIVE_MODE = "unity_pf"               #],'reactive_support']     # options: "unity_pf", "reactive_support"
+
+VERSIONING_TITLE = "RQ2"
+
+DESCRIPTION = "Running RQ2 with electrification factor"
+
 

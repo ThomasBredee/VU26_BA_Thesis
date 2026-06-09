@@ -35,21 +35,13 @@ def main():
 
     data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
 
+
+    print(sum(base_demand.values()))
+
     data['T'] = list(range(TIME))
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
-    if USE_GERMAN_PROFILES:
-        data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-        data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-    else:
-        data['pD'] = build_pD(
-            B=data['B'],
-            T=data['T'],
-            base_demand=base_demand,
-            profile=demand_data_percentages,
-            verbose=False
-        )
-        data['qD'] = build_qD(qp_ratio, data['pD'])
+    
 
 
     data['eta'] = BATTERY_EFFICIENCY ** (0.5)
@@ -67,45 +59,69 @@ def main():
     data['SOC_max'] = SOC_MAX
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} 
 
-    base_PV = generate_base_PV(data['B'], base_demand, PV_SHARE, PV_SCENARIO)
-
-    data['PV'] = build_PV(
-        B=data['B'],
-        T=data['T'],
-        base_demand=base_PV,
-        profile=PV_data_percentages,
-        verbose=False
-    )
     
-    data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
-
     # bus_ranking = rank_buses_for_PV(PV_SCENARIO, data, verbose = True)
     for num_battery in AMOUNT_OF_BATTERIES:
+        for electrification in ELECTRIFICATION_FACTOR:
 
-        print("\n======================================")
-        print(f"Running BESS scenario: {num_battery}")
-        print("======================================")
+            pv_share = electrification
 
-        print("Building model constraints........")
-        model = build_model_reactive(data, 
-                                     num_batteries = num_battery
-                                    )
+            if electrification != 1.0:
+                base_demand = {
+                    bus: value * electrification
+                    for bus, value in base_demand.items()
+                }
 
-        print("Solving model ....................")
-        solved_model = solve_model(model, tee=True)
+            if USE_GERMAN_PROFILES:
+                data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+                data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+            else:
+                data['pD'] = build_pD(
+                    B=data['B'],
+                    T=data['T'],
+                    base_demand=base_demand,
+                    profile=demand_data_percentages,
+                    verbose=False
+                )
+                data['qD'] = build_qD(qp_ratio, data['pD'])
 
-        if solved_model:
-            print("Exporting thesis results........")
+            base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
 
-            export_thesis_results(
-                model,
-                data,
-                num_battery,
-                PV_SHARE,
-                versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}"
+            data['PV'] = build_PV(
+                B=data['B'],
+                T=data['T'],
+                base_demand=base_PV,
+                profile=PV_data_percentages,
+                verbose=False
             )
+            
+            data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
+    
 
-            print(f"Finished BESS scenario {num_battery:.2f}")
+            print("\n======================================")
+            print(f"Running BESS {num_battery} + ELECTRIFICATION scenario: {electrification} ")
+            print("======================================")
+
+            print("Building model constraints........")
+            model = build_model_reactive(data, 
+                                        num_batteries = num_battery
+                                        )
+
+            print("Solving model ....................")
+            solved_model = solve_model(model, tee=True)
+
+            if solved_model:
+                print("Exporting thesis results........")
+
+                export_thesis_results(
+                    model,
+                    data,
+                    num_battery,
+                    pv_share,
+                    versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}_elec={electrification:.2f}"
+                )
+
+                print(f"Finished BESS scenario {num_battery:.2f}, elec: {electrification:.2f}")
 
     print("\nPipeline executed successfully.")
     

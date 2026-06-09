@@ -185,22 +185,22 @@ def generate_base_PV(B, base_demand, pv_penetration, scenario):
         # ==========================================
         # Optional diagnostics
         # ==========================================
-        # print("\n======================================")
-        # print("PV ALLOCATION (Voltage Severity)")
-        # print("======================================")
+        print("\n======================================")
+        print("PV ALLOCATION (Voltage Severity)")
+        print("======================================")
 
-        # print(
-        #     top[
-        #         [
-        #             "rank",
-        #             "bus",
-        #             "severity_score",
-        #             "demand",
-        #             "hybrid_score",
-        #             "weight"
-        #         ]
-        #     ].to_string(index=False)
-        # )
+        print(
+            top[
+                [
+                    "rank",
+                    "bus",
+                    "severity_score",
+                    "demand",
+                    "hybrid_score",
+                    "weight"
+                ]
+            ].to_string(index=False)
+        )
 
 
     if scenario == "LINE_STABILITY_INDEX":

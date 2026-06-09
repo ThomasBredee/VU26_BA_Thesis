@@ -21,7 +21,7 @@ def build_model_reactive(data, num_batteries = AMOUNT_OF_BATTERIES):
     # -------------------------
     model.r = Param(model.L, initialize=data['r_pu'])   # resistance (p.u.)
     model.x = Param(model.L, initialize=data['x_pu'])   # reactance (p.u.) 
-    model.Smax_line = Param(model.L, initialize=data['Pmax_line'])     # Line apparent power limit (kVA or p.u. consistent)
+    model.Smax_line = Param(model.L, initialize=data['Pmax_line'])     # Line apparent power limit (p.u.)
     model.v_min = Param(initialize=data['V_min']**2)   # (0.95)^2     # Voltage limits (squared p.u.)
     model.v_max = Param(initialize=data['V_max']**2)   # (1.05)^2     # Voltage limits (squared p.u.)
     

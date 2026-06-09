@@ -147,7 +147,8 @@ def export_config_settings(data, output_dir):
         # -------------------------
         "ALLOW_ENERGY_EXPORT": ALLOW_ENERGY_EXPORT,
         "USE_GERMAN_PROFILES": USE_GERMAN_PROFILES,
-        "AMOUNT_OF_BATTERIES": AMOUNT_OF_BATTERIES
+        "AMOUNT_OF_BATTERIES": AMOUNT_OF_BATTERIES,
+        "ELECTRIFICATION_FACTOR": ELECTRIFICATION_FACTOR
     }
 
     df = pd.DataFrame(

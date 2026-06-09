@@ -31,8 +31,7 @@ figures/
 *.jpg
 
 # Thesis result exports
-# results_*/
-aresults_*/
+results_*/
 
 # Logs
 *.log

@@ -117,7 +117,7 @@ def extract_network_data(net, verbose=False):
         S_max_line_MVA = np.sqrt(3) * V_kv * I_max # Apparent power limit (3-phase)
 
         # Store using tree orientation (i → j)
-        Pmax_line[(i, j)] = S_max_line_MVA / S_base_MVA#* 1000  # kW Unit conversion to p.u.
+        Pmax_line[(i, j)] = S_max_line_MVA / S_base_MVA  # kW Unit conversion to p.u.
 
 
     # ---------------------------
