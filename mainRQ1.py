@@ -59,7 +59,7 @@ def main():
     data['SOC_max'] = SOC_MAX
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} 
 
-    
+    print("start base demand", base_demand)
     # bus_ranking = rank_buses_for_PV(PV_SCENARIO, data, verbose = True)
     for num_battery in AMOUNT_OF_BATTERIES:
         for electrification in ELECTRIFICATION_FACTOR:
@@ -72,56 +72,58 @@ def main():
                     for bus, value in base_demand.items()
                 }
 
-            if USE_GERMAN_PROFILES:
-                data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-                data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-            else:
-                data['pD'] = build_pD(
-                    B=data['B'],
-                    T=data['T'],
-                    base_demand=base_demand,
-                    profile=demand_data_percentages,
-                    verbose=False
-                )
-                data['qD'] = build_qD(qp_ratio, data['pD'])
+            print(pv_share)
+            print(base_demand[0])
+            # if USE_GERMAN_PROFILES:
+            #     data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+            #     data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+            # else:
+            #     data['pD'] = build_pD(
+            #         B=data['B'],
+            #         T=data['T'],
+            #         base_demand=base_demand,
+            #         profile=demand_data_percentages,
+            #         verbose=False
+            #     )
+            #     data['qD'] = build_qD(qp_ratio, data['pD'])
 
-            base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
+            # base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
 
-            data['PV'] = build_PV(
-                B=data['B'],
-                T=data['T'],
-                base_demand=base_PV,
-                profile=PV_data_percentages,
-                verbose=False
-            )
+            # data['PV'] = build_PV(
+            #     B=data['B'],
+            #     T=data['T'],
+            #     base_demand=base_PV,
+            #     profile=PV_data_percentages,
+            #     verbose=False
+            # )
             
-            data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
+            # data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
     
 
-            print("\n======================================")
-            print(f"Running BESS {num_battery} + ELECTRIFICATION scenario: {electrification} ")
-            print("======================================")
+            # print("\n======================================")
+            # print(f"Running BESS {num_battery} + ELECTRIFICATION scenario: {electrification} ")
+            # print("======================================")
 
-            print("Building model constraints........")
-            model = build_model_reactive(data, 
-                                        num_batteries = num_battery
-                                        )
+            # print("Building model constraints........")
+            # model = build_model_reactive(data, 
+            #                             num_batteries = num_battery
+            #                             )
 
-            print("Solving model ....................")
-            solved_model = solve_model(model, tee=True)
+            # print("Solving model ....................")
+            # solved_model = solve_model(model, tee=True)
 
-            if solved_model:
-                print("Exporting thesis results........")
+            # if solved_model:
+            #     print("Exporting thesis results........")
 
-                export_thesis_results(
-                    model,
-                    data,
-                    num_battery,
-                    pv_share,
-                    versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}_elec={electrification:.2f}"
-                )
+            #     export_thesis_results(
+            #         model,
+            #         data,
+            #         num_battery,
+            #         pv_share,
+            #         versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}_elec={electrification:.2f}"
+            #     )
 
-                print(f"Finished BESS scenario {num_battery:.2f}, elec: {electrification:.2f}")
+            #     print(f"Finished BESS scenario {num_battery:.2f}, elec: {electrification:.2f}")
 
     print("\nPipeline executed successfully.")
     
