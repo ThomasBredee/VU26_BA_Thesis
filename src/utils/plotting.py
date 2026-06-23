@@ -31,7 +31,7 @@ def plot_daily_average(profile, naming):
 
     plt.title(name)
     plt.xlabel("Date")
-    plt.ylabel("Value")
+    plt.ylabel("Normalized hourly demand share")
 
     plt.show()
 
@@ -52,7 +52,7 @@ def plot_hourly_pattern(profile, naming):
 
     plt.title(name)
     plt.xlabel("Hour of Day")
-    plt.ylabel("Value")
+    plt.ylabel("Normalized hourly demand share")
 
     plt.xticks(range(0, 24))
 

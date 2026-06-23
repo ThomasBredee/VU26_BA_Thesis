@@ -49,12 +49,12 @@ def load__demand_and_PV_profile_percentages(filepath, verbose_demand=False, verb
 
 
 
-def plot_first_hours_prices(prices_df, n=4385):
+def plot_first_hours_prices(prices_df, n=8759):
     plt.figure(figsize=(12, 5))
     plt.plot(prices_df.index[:n], prices_df['Price'][:n], linestyle='-')
-    plt.title(f"Electricity Prices — First {n} Hours")
+    plt.title(f"Electricity Prices - Full Year") #— First {n} Hours")
     plt.xlabel("Datetime")
-    plt.ylabel("Price [EUR/MWhe]")
+    plt.ylabel("Price [EUR/MWh]")
     plt.xticks(rotation=45)
     plt.grid(True)
     plt.tight_layout()

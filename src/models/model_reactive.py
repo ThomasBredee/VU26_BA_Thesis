@@ -208,13 +208,8 @@ def build_model_reactive(data, num_batteries = AMOUNT_OF_BATTERIES):
             return m.qPV[i, t] == 0
         model.UnityPF = Constraint(model.B, model.T, rule=unity_pf_rule)
 
-    # Battery rule
-    if isinstance(AMOUNT_OF_BATTERIES, list):
-        def battery_budget_rule(m):
-            return sum(m.b[i] for i in m.B) == num_batteries
-    else:
-        def battery_budget_rule(m):
-            return sum(m.b[i] for i in m.B) <= num_batteries
+    def battery_budget_rule(m):
+        return sum(m.b[i] for i in m.B) <= num_batteries
     model.BatteryBudget = Constraint(rule=battery_budget_rule)
 
     # SOC dynamics (correct efficiency form)

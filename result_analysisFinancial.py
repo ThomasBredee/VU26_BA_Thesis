@@ -149,7 +149,7 @@ def plot_cost_breakdown(df):
     ).reset_index(drop=True)
 
     labels = [
-        f"B{int(row.BESS)}\nE{row.Electrification:.1f}"
+        f"B{int(row.BESS)}\nE{row.Electrification:.2f}"
         for _, row in df.iterrows()
     ]
 
@@ -260,4 +260,4 @@ def plot_optimal_battery_size(df):
 
 df = collect_objective_results(".", "RQ1.2")
 plot_cost_breakdown(df)
-plot_optimal_battery_size(df)
+# plot_optimal_battery_size(df)

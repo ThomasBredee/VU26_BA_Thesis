@@ -25,6 +25,35 @@ from src.utils.results_export import *
 
 from src.utils.robustness_check import *
 
+import os
+import pandas as pd
+
+
+def save_timeseries_dict_to_csv(timeseries_dict, output_path, value_col):
+    """
+    Saves a dictionary with keys (bus, time) to CSV.
+    Example input:
+        data['pD'][(bus, t)] = value
+        data['PV'][(bus, t)] = value
+    """
+
+    df = pd.DataFrame(
+        [
+            {
+                "bus": bus,
+                "time": time,
+                value_col: value
+            }
+            for (bus, time), value in timeseries_dict.items()
+        ]
+    )
+
+    df = df.sort_values(["bus", "time"])
+
+    df.to_csv(output_path, index=False)
+
+    print(f"Saved: {output_path}")
+
 def main():
     print('Starting pipeline.................')
 
@@ -33,16 +62,14 @@ def main():
     # test_network(net)
     # robustness_checker()
 
-    data , base_demand, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
+    data , base_demand_original, base_reactive_demand, qp_ratio = extract_network_data(net, verbose=False)
 
 
-    print(sum(base_demand.values()))
 
     data['T'] = list(range(TIME))
     demand_data_percentages, PV_data_percentages = load__demand_and_PV_profile_percentages(DATA_PATH_DEMAND, verbose_demand=False, verbose_PV=False)
     
     
-
 
     data['eta'] = BATTERY_EFFICIENCY ** (0.5)
     data['alpha'] = ALPHA
@@ -59,49 +86,66 @@ def main():
     data['SOC_max'] = SOC_MAX
     data['c_curt'] = {t: max(data['c'][t], 0) for t in data['T']} 
 
-    print("start base demand", base_demand)
+    
     # bus_ranking = rank_buses_for_PV(PV_SCENARIO, data, verbose = True)
     for num_battery in AMOUNT_OF_BATTERIES:
-        for electrification in ELECTRIFICATION_FACTOR:
+        for electrification, pv_share in zip(ELECTRIFICATION_FACTOR, PV_SHARE):
 
-            pv_share = electrification
+            base_demand = {
+                bus: value * electrification
+                for bus, value in base_demand_original.items()
+            }
 
-            if electrification != 1.0:
-                base_demand = {
-                    bus: value * electrification
-                    for bus, value in base_demand.items()
-                }
+            if USE_GERMAN_PROFILES:
+                data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+                data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
+            else:
+                data['pD'] = build_pD(
+                    B=data['B'],
+                    T=data['T'],
+                    base_demand=base_demand,
+                    profile=demand_data_percentages,
+                    verbose=False
+                )
+                data['qD'] = build_qD(qp_ratio, data['pD'])
 
-            print(pv_share)
-            print(base_demand[0])
-            # if USE_GERMAN_PROFILES:
-            #     data['pD'] = build_pD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-            #     data['qD'] = build_qD_from_simbench(net, data['B'], data['T'], data["S_base_kVA"], verbose=True)
-            # else:
-            #     data['pD'] = build_pD(
-            #         B=data['B'],
-            #         T=data['T'],
-            #         base_demand=base_demand,
-            #         profile=demand_data_percentages,
-            #         verbose=False
-            #     )
-            #     data['qD'] = build_qD(qp_ratio, data['pD'])
+            print("PV share: ",pv_share)
+            print("PV scene: ",PV_SCENARIO)
+            base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
 
-            # base_PV = generate_base_PV(data['B'], base_demand, pv_share, PV_SCENARIO)
+            print("Base_PV: ", base_PV)
 
-            # data['PV'] = build_PV(
-            #     B=data['B'],
-            #     T=data['T'],
-            #     base_demand=base_PV,
-            #     profile=PV_data_percentages,
-            #     verbose=False
-            # )
+            data['PV'] = build_PV(
+                B=data['B'],
+                T=data['T'],
+                base_demand=base_PV,
+                profile=PV_data_percentages,
+                verbose=False
+            )
             
-            # data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
+            data['S_inv'] = build_S_inv(data['B'],data['T'],data['PV'])
+
+            os.makedirs("data", exist_ok=True)
+
+            scenario_name = (
+                f"elec={electrification:.2f}_PV={pv_share:.2f}"
+            )
+
+            save_timeseries_dict_to_csv(
+                data["pD"],
+                output_path=f"data/pD_{scenario_name}.csv",
+                value_col="pD_pu"
+            )
+
+            save_timeseries_dict_to_csv(
+                data["PV"],
+                output_path=f"data/PV_{scenario_name}.csv",
+                value_col="PV_pu"
+            )
     
 
             # print("\n======================================")
-            # print(f"Running BESS {num_battery} + ELECTRIFICATION scenario: {electrification} ")
+            # print(f"Running BESS {num_battery} + ELECTRIFICATION scenario: {electrification} + PV_share {pv_share} ")
             # print("======================================")
 
             # print("Building model constraints........")
@@ -120,10 +164,10 @@ def main():
             #         data,
             #         num_battery,
             #         pv_share,
-            #         versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}_elec={electrification:.2f}"
+            #         versioning=f"{VERSIONING_TITLE}_Batt={num_battery:.2f}_elec={electrification:.2f}_P={pv_share:.2f}"
             #     )
 
-            #     print(f"Finished BESS scenario {num_battery:.2f}, elec: {electrification:.2f}")
+            #     print(f"Finished BESS scenario {num_battery:.2f}, elec: {electrification:.2f}, pv: {pv_share:.2f}")
 
     print("\nPipeline executed successfully.")
     
